@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 280" fill="none">
+  <path d="M34 118C45 68 89 40 155 33C232 25 287 53 303 111C319 166 301 228 255 256C209 284 141 286 89 266C24 239 17 188 34 118Z" fill="#346D4A"/>
+  <circle cx="133" cy="140" r="26" fill="#fff"/>
+  <circle cx="188" cy="140" r="26" fill="#fff"/>
+  <circle cx="139" cy="142" r="20" fill="#000">
+    <animate attributeName="cx" values="136;141;136" dur="3.2s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="194" cy="142" r="20" fill="#000">
+    <animate attributeName="cx" values="191;196;191" dur="3.2s" repeatCount="indefinite"/>
+  </circle>
+  <path d="M147 193C162 210 186 210 201 192" stroke="#000" stroke-width="8" stroke-linecap="round"/>
+</svg>
