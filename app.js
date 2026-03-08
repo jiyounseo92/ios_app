@@ -9,6 +9,7 @@ const SYNC_APP_VERSION = "inmypocket-sync-v1";
 const GITHUB_GIST_SYNC_FILE = "inmypocket-sync.json";
 const SUPABASE_SYNC_TABLE = "inmypocket_sync_state";
 const SUPABASE_SYNC_ROW_ID = "shared";
+const LEGACY_SHARED_ROOM_CODE = "__legacy_shared__";
 const SUPABASE_DEFAULT_ENDPOINT = "https://quqjegudupmocwiuwbga.supabase.co";
 const SUPABASE_DEFAULT_PUBLISHABLE_KEY = "sb_publishable_3FBUiXSH-R2mnj1etyuifA_Tm_7ALWW";
 const SYNC_AUTO_MANAGED = true;
@@ -365,6 +366,7 @@ const DEFAULT_SYNC_CONFIG = {
   enabled: true,
   endpoint: SUPABASE_DEFAULT_ENDPOINT,
   token: SUPABASE_DEFAULT_PUBLISHABLE_KEY,
+  roomCode: "",
   intervalSec: 30,
 };
 
@@ -554,10 +556,14 @@ const syncIntervalEl = document.getElementById("sync-interval");
 const syncEnabledEl = document.getElementById("sync-enabled");
 const syncNowEl = document.getElementById("sync-now");
 const syncStatusEl = document.getElementById("sync-status");
+const syncRoomCodeEl = document.getElementById("sync-room-code");
+const syncCopyLinkEl = document.getElementById("sync-copy-link");
+const syncShareLinkEl = document.getElementById("sync-share-link");
 
 const onboardingOverlayEl = document.getElementById("onboarding-overlay");
 const onboardingIntroEl = document.getElementById("onboarding-intro");
 const onboardingSetupEl = document.getElementById("onboarding-setup");
+const onboardingJoinEl = document.getElementById("onboarding-join");
 const onboardingTitleCharEl = document.getElementById("onboarding-title-char");
 const onboardingTitleEl = document.getElementById("onboarding-title");
 const onboardingSubEl = document.getElementById("onboarding-sub");
@@ -568,6 +574,10 @@ const onboardLedgerRowsEl = document.getElementById("onboard-ledger-rows");
 const onboardLedgerAddEl = document.getElementById("onboard-ledger-add");
 const onboardCombinedRowsEl = document.getElementById("onboard-combined-rows");
 const onboardCombinedAddEl = document.getElementById("onboard-combined-add");
+const onboardingShareCodeEl = document.getElementById("onboarding-share-code");
+const onboardingShareJoinBtnEl = document.getElementById("onboarding-share-join-btn");
+const onboardingStartNewBtnEl = document.getElementById("onboarding-start-new-btn");
+const onboardingShareStatusEl = document.getElementById("onboarding-share-status");
 const onboardCardRowsEl = document.getElementById("onboard-card-rows");
 const onboardBankRowsEl = document.getElementById("onboard-bank-rows");
 const onboardCardAddEl = document.getElementById("onboard-card-add");
@@ -592,16 +602,9 @@ const ruleLedgerInput = document.getElementById("rule-ledger");
 const ruleKindInput = document.getElementById("rule-kind");
 const ruleListEl = document.getElementById("rule-list");
 
-const ONBOARDING_STEPS = [
-  { title: "환영합니다!", sub: "" },
-  { title: "간단한 설정을\n시작해 볼까요?", sub: "" },
-  {
-    title: "사용할 계정을 설정해주세요!",
-    sub: "<span class=\"onboarding-sub-small\">‘설정’ 탭에서 언제든 변경할 수 있습니다.</span>",
-  },
-];
-const ONBOARDING_STEP_CHARS = ["assets/chars/yellow.svg", "assets/chars/blue.svg", "assets/chars/pink.svg"];
-const ONBOARDING_SKIP_INTRO_BY_DEFAULT = true;
+const ONBOARDING_STEPS = [{ title: "환영합니다!", sub: "" }];
+const ONBOARDING_STEP_CHARS = ["assets/chars/yellow.svg"];
+const ONBOARDING_SKIP_INTRO_BY_DEFAULT = false;
 let onboardingTransitioning = false;
 let onboardingLastAdvanceAt = 0;
 const ONBOARDING_TRANSITION_MS = 780;
@@ -1397,6 +1400,35 @@ function renderOnboardingStep() {
   }
 }
 
+function showOnboardingJoinOnly() {
+  if (onboardingJoinEl) {
+    onboardingJoinEl.hidden = false;
+  }
+  if (onboardingFormEl) {
+    onboardingFormEl.hidden = true;
+  }
+  if (onboardingShareStatusEl) {
+    onboardingShareStatusEl.textContent = "";
+  }
+  if (onboardingShareCodeEl && !onboardingShareCodeEl.value) {
+    const roomFromUrl = normalizeShareRoomCode(new URLSearchParams(window.location.search).get("room"));
+    onboardingShareCodeEl.value = roomFromUrl || normalizeShareRoomCode(syncRuntime.config?.roomCode || "");
+  }
+}
+
+function showOnboardingSetupForm() {
+  if (onboardingFormEl) {
+    onboardingFormEl.hidden = false;
+  }
+  if (onboardingJoinEl) {
+    onboardingJoinEl.hidden = false;
+  }
+  populateOnboardingSetupRows();
+  if (onboardingShareStatusEl) {
+    onboardingShareStatusEl.textContent = "아래에서 새 장부 설정을 완료해주세요.";
+  }
+}
+
 function openOnboarding() {
   if (!onboardingOverlayEl || !onboardingIntroEl || !onboardingSetupEl) {
     return;
@@ -1411,6 +1443,7 @@ function openOnboarding() {
   onboardingIntroEl.hidden = false;
   onboardingIntroEl.classList.remove("is-transitioning", "is-hiding");
   onboardingSetupEl.hidden = true;
+  showOnboardingJoinOnly();
   document.body.classList.add("onboarding-active");
   renderOnboardingStep();
   const params = new URLSearchParams(window.location.search);
@@ -1418,34 +1451,38 @@ function openOnboarding() {
     params.get("forceSetup") === "1" ||
     (ONBOARDING_SKIP_INTRO_BY_DEFAULT && params.get("showIntro") !== "1");
   if (shouldSkipIntro) {
-    onboardingIntroEl.hidden = true;
-    onboardingSetupEl.hidden = false;
-    onboardingOverlayEl.classList.add("show-setup");
-    populateOnboardingSetupRows();
+    openOnboardingForm({ skipAnimation: true });
   }
 }
 
-function openOnboardingForm() {
+function openOnboardingForm(options = {}) {
+  const skipAnimation = Boolean(options?.skipAnimation);
   if (!onboardingIntroEl || !onboardingSetupEl) {
     return;
   }
-  if (onboardingTransitioning) {
+  if (onboardingTransitioning && !skipAnimation) {
     return;
   }
-  onboardingTransitioning = true;
-  onboardingIntroEl.classList.remove("is-transitioning");
-  onboardingIntroEl.classList.add("is-hiding");
-
-  window.setTimeout(() => {
+  const finalize = () => {
     onboardingIntroEl.hidden = true;
     onboardingIntroEl.classList.remove("is-hiding");
     onboardingSetupEl.hidden = false;
     if (onboardingOverlayEl) {
       onboardingOverlayEl.classList.add("show-setup");
     }
-    populateOnboardingSetupRows();
+    showOnboardingJoinOnly();
     onboardingTransitioning = false;
-  }, ONBOARDING_TRANSITION_MS);
+  };
+  if (skipAnimation) {
+    onboardingTransitioning = false;
+    finalize();
+    return;
+  }
+  onboardingTransitioning = true;
+  onboardingIntroEl.classList.remove("is-transitioning");
+  onboardingIntroEl.classList.add("is-hiding");
+
+  window.setTimeout(finalize, ONBOARDING_TRANSITION_MS);
 }
 
 function closeOnboarding() {
@@ -1496,6 +1533,60 @@ function advanceOnboardingStep(event) {
 
 function handleOnboardingIntroClick(event) {
   advanceOnboardingStep(event);
+}
+
+async function handleOnboardingJoinByCode() {
+  const roomCode = normalizeShareRoomCode(onboardingShareCodeEl?.value || "");
+  if (!roomCode) {
+    if (onboardingShareStatusEl) {
+      onboardingShareStatusEl.textContent = "공유 비밀번호를 먼저 입력해주세요.";
+    }
+    return;
+  }
+  if (onboardingShareStatusEl) {
+    onboardingShareStatusEl.textContent = "공유 기록 연결 중...";
+  }
+
+  syncRuntime.config = normalizeSyncConfig({
+    ...syncRuntime.config,
+    enabled: true,
+    roomCode,
+  });
+  saveSyncConfig();
+  populateSyncForm();
+  renderSyncStatus();
+
+  try {
+    const remoteEnvelope = await fetchRemoteEnvelopeFromSupabase();
+    if (!remoteEnvelope) {
+      if (onboardingShareStatusEl) {
+        onboardingShareStatusEl.textContent = "해당 비밀번호의 공유 기록을 찾지 못했어요. 새로 시작을 눌러 설정할 수 있어요.";
+      }
+      return;
+    }
+
+    applyRemoteEnvelope(remoteEnvelope);
+    state.settings.userProfile = normalizeUserProfile({
+      ...(state.settings.userProfile || {}),
+      onboardingDone: true,
+    });
+    saveSettings();
+    closeOnboarding();
+    setCurrentView("home");
+    startSyncPolling();
+    triggerSync({ reason: "onboarding-join", urgent: true });
+    if (parserPreview) {
+      parserPreview.textContent = "공유 기록 연결 완료.";
+    }
+  } catch (error) {
+    if (onboardingShareStatusEl) {
+      onboardingShareStatusEl.textContent = `연결 실패: ${getSyncErrorMessage(error)}`;
+    }
+  }
+}
+
+function handleOnboardingStartNew() {
+  showOnboardingSetupForm();
 }
 
 function handleOnboardingOverlayTap(event) {
@@ -1568,7 +1659,8 @@ function handleOnboardingSubmit(event) {
       settingsAccountsManageGridEl?.closest(".card")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     if (parserPreview) {
-      parserPreview.textContent = "첫 설정 저장 완료. 다음으로 계정별 통장/카드를 설정해주세요.";
+      parserPreview.textContent =
+        "첫 설정 저장 완료. 다음으로 계정별 통장/카드를 설정하고, 웹/모바일 자동 연동에서 공유 비밀번호를 설정해 주세요.";
     }
     finished = true;
   } catch (error) {
@@ -1793,6 +1885,22 @@ function init() {
     onboardingFormEl.noValidate = true;
     onboardingFormEl.addEventListener("submit", handleOnboardingSubmit);
   }
+  if (onboardingShareJoinBtnEl) {
+    onboardingShareJoinBtnEl.addEventListener("click", () => {
+      handleOnboardingJoinByCode();
+    });
+  }
+  if (onboardingStartNewBtnEl) {
+    onboardingStartNewBtnEl.addEventListener("click", handleOnboardingStartNew);
+  }
+  if (onboardingShareCodeEl) {
+    onboardingShareCodeEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        handleOnboardingJoinByCode();
+      }
+    });
+  }
   if (onboardingSubmitBtnEl) {
     onboardingSubmitBtnEl.addEventListener("click", (event) => {
       event.preventDefault();
@@ -1891,6 +1999,18 @@ function init() {
   }
   if (syncFormEl) {
     syncFormEl.addEventListener("submit", handleSyncFormSubmit);
+  }
+  if (syncCopyLinkEl) {
+    syncCopyLinkEl.addEventListener("click", handleSyncCopyLinkClick);
+  }
+  if (syncRoomCodeEl) {
+    syncRoomCodeEl.addEventListener("input", () => {
+      if (!syncShareLinkEl) {
+        return;
+      }
+      const link = buildShareInviteLink(syncRoomCodeEl.value);
+      syncShareLinkEl.textContent = link ? `공유 링크: ${link}` : "공유 비밀번호를 설정하면 링크를 만들 수 있어요.";
+    });
   }
   if (syncNowEl) {
     syncNowEl.addEventListener("click", handleSyncNowClick);
@@ -1995,7 +2115,7 @@ function init() {
     openOnboarding();
   }
   startSyncPolling();
-  if (syncRuntime.config.enabled) {
+  if (isSyncRunnable()) {
     triggerSync({ reason: "startup", urgent: true });
   }
 }
@@ -3477,7 +3597,25 @@ function renderFriendShortcutSettings() {
 }
 
 function initializeSyncRuntime() {
+  let hadLegacyConfigWithoutRoom = false;
+  try {
+    const rawConfig = localStorage.getItem(SYNC_CONFIG_KEY);
+    if (rawConfig) {
+      const parsed = safeParseJson(rawConfig);
+      hadLegacyConfigWithoutRoom = Boolean(parsed && typeof parsed === "object" && !normalizeShareRoomCode(parsed.roomCode));
+    }
+  } catch {
+    hadLegacyConfigWithoutRoom = false;
+  }
   syncRuntime.config = loadSyncConfig();
+  const roomFromUrl = normalizeShareRoomCode(new URLSearchParams(window.location.search).get("room"));
+  if (roomFromUrl) {
+    syncRuntime.config = normalizeSyncConfig({
+      ...syncRuntime.config,
+      roomCode: roomFromUrl,
+    });
+    saveSyncConfig();
+  }
   syncRuntime.meta = loadSyncMeta();
   if (!syncRuntime.meta.deviceId) {
     syncRuntime.meta.deviceId = getOrCreateSyncDeviceId();
@@ -3491,6 +3629,13 @@ function initializeSyncRuntime() {
     // First sync on an existing device: keep a tiny revision so remote data can still win if newer.
     syncRuntime.meta.lastLocalUpdatedAt = 1;
     saveSyncMeta();
+  }
+  if (!roomFromUrl && hadLegacyConfigWithoutRoom && hasExistingLocalLedgerData()) {
+    syncRuntime.config = normalizeSyncConfig({
+      ...syncRuntime.config,
+      roomCode: LEGACY_SHARED_ROOM_CODE,
+    });
+    saveSyncConfig();
   }
   populateSyncForm();
   renderSyncStatus();
@@ -3524,6 +3669,9 @@ function populateSyncForm() {
   if (!syncFormEl || !syncEndpointEl || !syncTokenEl || !syncIntervalEl || !syncEnabledEl) {
     return;
   }
+  if (syncRoomCodeEl) {
+    syncRoomCodeEl.value = normalizeShareRoomCode(syncRuntime.config.roomCode || "");
+  }
   syncEndpointEl.value = syncRuntime.config.endpoint || "";
   syncTokenEl.value = syncRuntime.config.token || "";
   syncIntervalEl.value = String(syncRuntime.config.intervalSec || DEFAULT_SYNC_CONFIG.intervalSec);
@@ -3534,9 +3682,13 @@ function populateSyncForm() {
     syncEnabledEl.disabled = true;
     const submitButton = syncFormEl.querySelector('button[type="submit"]');
     if (submitButton) {
-      submitButton.textContent = "자동 설정됨";
-      submitButton.disabled = true;
+      submitButton.textContent = "공유 코드 저장";
+      submitButton.disabled = false;
     }
+  }
+  if (syncShareLinkEl) {
+    const link = buildShareInviteLink(syncRuntime.config.roomCode || "");
+    syncShareLinkEl.textContent = link ? `공유 링크: ${link}` : "공유 비밀번호를 설정하면 링크를 만들 수 있어요.";
   }
 }
 
@@ -3556,6 +3708,10 @@ function renderSyncStatus() {
     syncStatusEl.textContent = "연동 주소를 확인해주세요.";
     return;
   }
+  if (!normalizeShareRoomCode(config.roomCode)) {
+    syncStatusEl.textContent = "공유 비밀번호를 먼저 설정해주세요.";
+    return;
+  }
   if (meta.lastError) {
     syncStatusEl.classList.add("is-error");
     syncStatusEl.textContent = `연동 실패: ${meta.lastError}`;
@@ -3573,7 +3729,8 @@ function renderSyncStatus() {
     "up-to-date": "이미 최신 상태",
   };
   const actionLabel = actionMap[meta.lastResult] || "동기화 완료";
-  syncStatusEl.textContent = `${actionLabel} (${formatSyncDateTime(meta.lastSyncAt)})`;
+  const roomLabel = normalizeShareRoomCode(config.roomCode);
+  syncStatusEl.textContent = `${actionLabel} (${formatSyncDateTime(meta.lastSyncAt)})${roomLabel ? ` · 코드: ${roomLabel}` : ""}`;
 }
 
 function formatSyncDateTime(timestamp) {
@@ -3591,11 +3748,6 @@ function formatSyncDateTime(timestamp) {
 
 function handleSyncFormSubmit(event) {
   event.preventDefault();
-  if (SYNC_AUTO_MANAGED) {
-    parserPreview.textContent = "자동 연동은 이미 앱에 고정되어 있어요.";
-    renderSyncStatus();
-    return;
-  }
   if (!syncEndpointEl || !syncTokenEl || !syncIntervalEl || !syncEnabledEl) {
     return;
   }
@@ -3603,24 +3755,48 @@ function handleSyncFormSubmit(event) {
     enabled: syncEnabledEl.checked,
     endpoint: syncEndpointEl.value,
     token: syncTokenEl.value,
+    roomCode: syncRoomCodeEl ? syncRoomCodeEl.value : syncRuntime.config.roomCode,
     intervalSec: Number(syncIntervalEl.value),
   });
   saveSyncConfig();
   populateSyncForm();
   renderSyncStatus();
-  parserPreview.textContent = "자동 연동 설정을 저장했어요.";
+  if (!normalizeShareRoomCode(syncRuntime.config.roomCode)) {
+    parserPreview.textContent = "공유 비밀번호를 입력하면 동기화가 시작돼요.";
+    return;
+  }
+  parserPreview.textContent = "공유 설정을 저장했어요.";
   startSyncPolling();
-  if (syncRuntime.config.enabled) {
+  if (isSyncRunnable()) {
     triggerSync({ reason: "config-save", urgent: true });
   }
 }
 
 function handleSyncNowClick() {
-  if (!syncRuntime.config.enabled) {
-    parserPreview.textContent = "자동 연동을 먼저 켜주세요.";
+  if (!isSyncRunnable()) {
+    parserPreview.textContent = "공유 비밀번호를 먼저 설정해주세요.";
     return;
   }
   triggerSync({ reason: "manual", urgent: true });
+}
+
+async function handleSyncCopyLinkClick() {
+  const roomCode = normalizeShareRoomCode(syncRoomCodeEl?.value || syncRuntime.config.roomCode || "");
+  if (!roomCode) {
+    parserPreview.textContent = "공유 비밀번호를 먼저 입력해주세요.";
+    return;
+  }
+  const link = buildShareInviteLink(roomCode);
+  if (!link) {
+    parserPreview.textContent = "공유 링크를 만들 수 없어요.";
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(link);
+    parserPreview.textContent = "공유 링크를 복사했어요.";
+  } catch {
+    parserPreview.textContent = `공유 링크: ${link}`;
+  }
 }
 
 function startSyncPolling() {
@@ -3628,7 +3804,7 @@ function startSyncPolling() {
     window.clearInterval(syncRuntime.pollTimer);
     syncRuntime.pollTimer = null;
   }
-  if (!syncRuntime.config.enabled || !syncRuntime.config.endpoint) {
+  if (!isSyncRunnable()) {
     return;
   }
   const intervalSec = Math.max(10, Math.min(600, Number(syncRuntime.config.intervalSec) || DEFAULT_SYNC_CONFIG.intervalSec));
@@ -3638,7 +3814,7 @@ function startSyncPolling() {
 }
 
 function triggerSync({ reason = "manual", urgent = false } = {}) {
-  if (!syncRuntime.config.enabled || !syncRuntime.config.endpoint) {
+  if (!isSyncRunnable()) {
     renderSyncStatus();
     return;
   }
@@ -3662,7 +3838,7 @@ function triggerSync({ reason = "manual", urgent = false } = {}) {
 }
 
 async function runSync(reason = "auto") {
-  if (!syncRuntime.config.enabled || !syncRuntime.config.endpoint) {
+  if (!isSyncRunnable()) {
     renderSyncStatus();
     return;
   }
@@ -3872,8 +4048,12 @@ async function fetchRemoteEnvelopeFromSupabase() {
   if (!baseUrl) {
     return null;
   }
+  const roomRowId = getSyncRoomRowId();
+  if (!roomRowId) {
+    return null;
+  }
   const endpoint = `${baseUrl}/rest/v1/${SUPABASE_SYNC_TABLE}?id=eq.${encodeURIComponent(
-    SUPABASE_SYNC_ROW_ID
+    roomRowId
   )}&select=payload`;
   const response = await fetch(endpoint, {
     method: "GET",
@@ -3898,6 +4078,10 @@ async function pushRemoteEnvelopeToSupabase(envelope) {
   if (!baseUrl) {
     throw new Error("Supabase URL을 확인해주세요.");
   }
+  const roomRowId = getSyncRoomRowId();
+  if (!roomRowId) {
+    throw new Error("공유 비밀번호를 먼저 설정해주세요.");
+  }
   const endpoint = `${baseUrl}/rest/v1/${SUPABASE_SYNC_TABLE}?on_conflict=id`;
   const response = await fetch(endpoint, {
     method: "POST",
@@ -3907,7 +4091,7 @@ async function pushRemoteEnvelopeToSupabase(envelope) {
     }),
     body: JSON.stringify([
       {
-        id: SUPABASE_SYNC_ROW_ID,
+        id: roomRowId,
         payload: envelope,
       },
     ]),
@@ -7257,13 +7441,68 @@ function saveSyncConfig() {
   }
 }
 
+function normalizeShareRoomCode(raw) {
+  return String(raw || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 80);
+}
+
+function hashRoomCode(roomCode) {
+  const source = String(roomCode || "").toLowerCase();
+  let hash = 2166136261;
+  for (let i = 0; i < source.length; i += 1) {
+    hash ^= source.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function getSyncRoomRowId() {
+  const roomCode = normalizeShareRoomCode(syncRuntime.config?.roomCode || "");
+  if (roomCode === LEGACY_SHARED_ROOM_CODE) {
+    return SUPABASE_SYNC_ROW_ID;
+  }
+  if (!roomCode) {
+    return "";
+  }
+  return `room-${hashRoomCode(roomCode)}`;
+}
+
+function buildShareInviteLink(roomCode) {
+  const code = normalizeShareRoomCode(roomCode);
+  if (!code || code === LEGACY_SHARED_ROOM_CODE) {
+    return "";
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set("room", code);
+  url.searchParams.set("showIntro", "1");
+  url.searchParams.delete("fresh");
+  return url.toString();
+}
+
+function isSyncRunnable() {
+  if (!syncRuntime.config?.enabled) {
+    return false;
+  }
+  if (!syncRuntime.config.endpoint) {
+    return false;
+  }
+  if (!String(syncRuntime.config.token || "").trim()) {
+    return false;
+  }
+  return Boolean(getSyncRoomRowId());
+}
+
 function normalizeSyncConfig(input) {
+  const roomCode = normalizeShareRoomCode(input?.roomCode);
   if (SYNC_AUTO_MANAGED) {
     const intervalSec = Math.max(10, Math.min(600, Number(input?.intervalSec) || DEFAULT_SYNC_CONFIG.intervalSec));
     return {
       enabled: true,
       endpoint: SUPABASE_DEFAULT_ENDPOINT,
       token: SUPABASE_DEFAULT_PUBLISHABLE_KEY,
+      roomCode,
       intervalSec,
     };
   }
@@ -7274,6 +7513,7 @@ function normalizeSyncConfig(input) {
     enabled: Boolean(input?.enabled) && Boolean(endpoint),
     endpoint,
     token,
+    roomCode,
     intervalSec,
   };
 }
