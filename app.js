@@ -3709,7 +3709,7 @@ function populateSyncForm() {
     syncEnabledEl.disabled = true;
     const submitButton = syncFormEl.querySelector('button[type="submit"]');
     if (submitButton) {
-      submitButton.textContent = "공유 코드 저장";
+      submitButton.textContent = "공유 비밀번호 저장";
       submitButton.disabled = false;
     }
   }
@@ -3757,7 +3757,7 @@ function renderSyncStatus() {
   };
   const actionLabel = actionMap[meta.lastResult] || "동기화 완료";
   const roomLabel = normalizeShareRoomCode(config.roomCode);
-  syncStatusEl.textContent = `${actionLabel} (${formatSyncDateTime(meta.lastSyncAt)})${roomLabel ? ` · 코드: ${roomLabel}` : ""}`;
+  syncStatusEl.textContent = `${actionLabel} (${formatSyncDateTime(meta.lastSyncAt)})${roomLabel ? ` · 비밀번호: ${roomLabel}` : ""}`;
 }
 
 function formatSyncDateTime(timestamp) {
