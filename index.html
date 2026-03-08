@@ -160,7 +160,7 @@
     </script>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/icon-192.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=65" />
+    <link rel="stylesheet" href="styles.css?v=66" />
     <title>포켓 가계부</title>
   </head>
   <body>
@@ -176,7 +176,7 @@
 
       <section id="onboarding-setup" class="onboarding-setup" hidden>
         <div class="onboarding-setup-head">
-          <h2>첫 설정</h2>
+          <h2 id="onboarding-setup-title">공유 기록 연결</h2>
         </div>
         <section id="onboarding-join" class="onboarding-join-card">
           <h3 class="title-with-char"><img src="assets/chars/blue.svg" class="mini-char" alt="" /><span>공유 기록이 있나요?</span></h3>
@@ -377,14 +377,17 @@
 
       <section id="settings-account-manager-card" class="card view-settings" hidden>
         <div class="section-title-row">
-          <h2>계정별 통장/카드 관리</h2>
-          <p class="hint">계정마다 카드와 통장 목록을 별도로 관리</p>
+          <h2 class="single-line-title">계정별 통장/카드 관리</h2>
         </div>
         <p id="onboarding-account-manager-note" class="hint onboarding-account-manager-note" hidden>
-          지금 모두 입력하지 않아도 괜찮아요. 나중에 <strong>통장/카드</strong> 탭에서 언제든 수정할 수 있어요.
+          지금 모두 입력하지 않아도 괜찮아요.
+          <br />
+          <br />
+          나중에 설정 탭에서 언제든 수정할 수 있어요.
         </p>
         <div id="settings-accounts-manage-grid" class="accounts-manage-grid"></div>
         <div id="onboarding-account-manager-actions" class="onboarding-account-manager-actions" hidden>
+          <button id="onboarding-account-manager-skip" type="button" class="onboarding-manager-skip-btn">스킵</button>
           <button id="onboarding-account-manager-done" type="button" class="onboarding-manager-done-btn">완료</button>
         </div>
       </section>
@@ -743,6 +746,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=76"></script>
+    <script src="app.js?v=77"></script>
   </body>
 </html>

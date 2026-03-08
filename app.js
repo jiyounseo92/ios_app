@@ -468,6 +468,7 @@ const settingsAccountsManageGridEl = document.getElementById("settings-accounts-
 const onboardingAccountManagerNoteEl = document.getElementById("onboarding-account-manager-note");
 const onboardingAccountManagerActionsEl = document.getElementById("onboarding-account-manager-actions");
 const onboardingAccountManagerDoneEl = document.getElementById("onboarding-account-manager-done");
+const onboardingAccountManagerSkipEl = document.getElementById("onboarding-account-manager-skip");
 const goalPlannerCardEl = document.getElementById("goal-planner-card");
 const goalFormEl = document.getElementById("goal-form");
 const goalListEl = document.getElementById("goal-list");
@@ -563,6 +564,7 @@ const syncShareLinkEl = document.getElementById("sync-share-link");
 const onboardingOverlayEl = document.getElementById("onboarding-overlay");
 const onboardingIntroEl = document.getElementById("onboarding-intro");
 const onboardingSetupEl = document.getElementById("onboarding-setup");
+const onboardingSetupTitleEl = document.getElementById("onboarding-setup-title");
 const onboardingJoinEl = document.getElementById("onboarding-join");
 const onboardingTitleCharEl = document.getElementById("onboarding-title-char");
 const onboardingTitleEl = document.getElementById("onboarding-title");
@@ -1401,6 +1403,9 @@ function renderOnboardingStep() {
 }
 
 function showOnboardingJoinOnly() {
+  if (onboardingSetupTitleEl) {
+    onboardingSetupTitleEl.textContent = "공유 기록 연결";
+  }
   if (onboardingJoinEl) {
     onboardingJoinEl.hidden = false;
   }
@@ -1417,11 +1422,14 @@ function showOnboardingJoinOnly() {
 }
 
 function showOnboardingSetupForm() {
+  if (onboardingSetupTitleEl) {
+    onboardingSetupTitleEl.textContent = "새로 설정하기";
+  }
   if (onboardingFormEl) {
     onboardingFormEl.hidden = false;
   }
   if (onboardingJoinEl) {
-    onboardingJoinEl.hidden = false;
+    onboardingJoinEl.hidden = true;
   }
   populateOnboardingSetupRows();
   if (onboardingShareStatusEl) {
@@ -1828,6 +1836,9 @@ function init() {
   if (onboardingAccountManagerDoneEl) {
     onboardingAccountManagerDoneEl.addEventListener("click", handleOnboardingAccountManagerDone);
   }
+  if (onboardingAccountManagerSkipEl) {
+    onboardingAccountManagerSkipEl.addEventListener("click", handleOnboardingAccountManagerDone);
+  }
   if (friendLayer) {
     friendLayer.addEventListener("click", handleFriendAction);
   }
@@ -2158,6 +2169,7 @@ function applyCurrentView() {
   const isSettings = state.currentView === "settings";
   const isOnboardingSettingsOnly = isSettings && state.onboardingSettingsOnly;
   document.body.classList.toggle("view-home-mode", isHome);
+  document.body.classList.toggle("onboarding-settings-only", isOnboardingSettingsOnly);
   for (const section of homeSections) {
     section.hidden = !isHome;
   }
