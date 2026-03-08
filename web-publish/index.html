@@ -4,12 +4,214 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f8f5e8" />
+    <script>
+      (function () {
+        const bootParams = new URLSearchParams(window.location.search);
+        if (bootParams.get("fresh") === "1") {
+          const keysToClear = [
+            "mongle-ledger-flex-v1",
+            "mongle-ledger-flex-legacy-v0",
+            "mongle-ledger-flex-settings-v1",
+            "mongle-ledger-flex-friends-hidden-v1",
+            "mongle-ledger-flex-sync-config-v1",
+            "mongle-ledger-flex-sync-meta-v1",
+            "mongle-ledger-flex-device-id-v1",
+          ];
+          for (const key of keysToClear) {
+            try {
+              localStorage.removeItem(key);
+            } catch (_) {}
+          }
+        }
+
+        const steps = [
+          { title: "환영합니다!", sub: "" },
+          { title: "설정을 시작해 볼까요?", sub: "" },
+          {
+            title: "사용할 계정을 설정해주세요!",
+            sub: "<span class=\"onboarding-sub-small\">‘설정’ 탭에서 언제든 변경할 수 있습니다.</span>",
+          },
+        ];
+        const stepChars = ["assets/chars/yellow.svg", "assets/chars/blue.svg", "assets/chars/pink.svg"];
+        const transitionMs = 780;
+        let step = 0;
+        let transitioning = false;
+
+        function getEl(id) {
+          return document.getElementById(id);
+        }
+
+        function renderStep() {
+          const title = getEl("onboarding-title");
+          const sub = getEl("onboarding-sub");
+          const icon = getEl("onboarding-title-char");
+          if (title) {
+            title.textContent = steps[step].title;
+          }
+          if (sub) {
+            sub.innerHTML = steps[step].sub || "";
+          }
+          if (icon) {
+            icon.src = stepChars[step] || stepChars[0];
+          }
+        }
+
+        function openSetup() {
+          const overlay = getEl("onboarding-overlay");
+          const intro = getEl("onboarding-intro");
+          const setup = getEl("onboarding-setup");
+          if (!overlay || !intro || !setup || transitioning) {
+            return;
+          }
+          transitioning = true;
+          intro.classList.remove("is-transitioning");
+          intro.classList.add("is-hiding");
+          window.setTimeout(function () {
+            intro.hidden = true;
+            intro.classList.remove("is-hiding");
+            setup.hidden = false;
+            overlay.classList.add("show-setup");
+            transitioning = false;
+          }, transitionMs);
+        }
+
+        window.__onboardingTapFromHtml = function (event) {
+          const overlay = getEl("onboarding-overlay");
+          const intro = getEl("onboarding-intro");
+          const setup = getEl("onboarding-setup");
+          if (!overlay || overlay.hidden || !intro || intro.hidden) {
+            return;
+          }
+          if (setup && !setup.hidden) {
+            return;
+          }
+          if (event && typeof event.preventDefault === "function") {
+            event.preventDefault();
+          }
+          if (event && typeof event.stopPropagation === "function") {
+            event.stopPropagation();
+          }
+          if (transitioning) {
+            return;
+          }
+          if (step >= steps.length - 1) {
+            openSetup();
+            return;
+          }
+          transitioning = true;
+          intro.classList.add("is-transitioning");
+          window.setTimeout(function () {
+            step += 1;
+            renderStep();
+            intro.classList.remove("is-transitioning");
+            transitioning = false;
+          }, transitionMs);
+        };
+
+        window.__onboardingSubmitFallback = function () {
+          window.setTimeout(function () {
+            const overlay = getEl("onboarding-overlay");
+            if (!overlay || overlay.hidden) {
+              return;
+            }
+            overlay.hidden = true;
+            overlay.classList.remove("show-setup");
+            document.body.classList.remove("onboarding-active");
+          }, 520);
+        };
+
+        document.addEventListener(
+          "pointerdown",
+          function (event) {
+            const overlay = getEl("onboarding-overlay");
+            const intro = getEl("onboarding-intro");
+            const setup = getEl("onboarding-setup");
+            if (!overlay || overlay.hidden || !intro || intro.hidden) {
+              return;
+            }
+            if (setup && !setup.hidden) {
+              return;
+            }
+            window.__onboardingTapFromHtml(event);
+          },
+          true
+        );
+
+        document.addEventListener(
+          "keydown",
+          function (event) {
+            const overlay = getEl("onboarding-overlay");
+            const intro = getEl("onboarding-intro");
+            const setup = getEl("onboarding-setup");
+            if (!overlay || overlay.hidden || !intro || intro.hidden) {
+              return;
+            }
+            if (setup && !setup.hidden) {
+              return;
+            }
+            if (event && (event.key === "Enter" || event.key === " " || event.key === "ArrowRight")) {
+              window.__onboardingTapFromHtml(event);
+            }
+          },
+          true
+        );
+      })();
+    </script>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/icon-192.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=63" />
     <title>포켓 가계부</title>
   </head>
   <body>
+    <section id="onboarding-overlay" class="onboarding-overlay" hidden aria-live="polite" onclick="window.__onboardingTapFromHtml && window.__onboardingTapFromHtml(event)" onpointerdown="window.__onboardingTapFromHtml && window.__onboardingTapFromHtml(event)" ontouchstart="window.__onboardingTapFromHtml && window.__onboardingTapFromHtml(event)">
+      <div id="onboarding-intro" class="onboarding-intro" role="button" tabindex="0" aria-label="온보딩 다음" onclick="window.__onboardingTapFromHtml && window.__onboardingTapFromHtml(event)" onpointerdown="window.__onboardingTapFromHtml && window.__onboardingTapFromHtml(event)" ontouchstart="window.__onboardingTapFromHtml && window.__onboardingTapFromHtml(event)">
+        <p class="onboarding-title-wrap">
+          <img id="onboarding-title-char" src="assets/chars/yellow.svg" class="mini-char intro-title-char" alt="" />
+          <span id="onboarding-title" class="onboarding-title">환영합니다!</span>
+        </p>
+        <p id="onboarding-sub" class="onboarding-sub"></p>
+        <p class="onboarding-tap">화면을 눌러 다음으로</p>
+      </div>
+
+      <section id="onboarding-setup" class="onboarding-setup" hidden>
+        <div class="onboarding-setup-head">
+          <h2>첫 설정</h2>
+        </div>
+        <form id="onboarding-form" class="onboarding-form" autocomplete="off" novalidate>
+          <article class="onboarding-block">
+            <h3 class="title-with-char"><img src="assets/chars/blue.svg" class="mini-char" alt="" /><span>계정 이름</span></h3>
+            <div id="onboard-ledger-rows" class="onboard-entry-list"></div>
+            <button type="button" id="onboard-ledger-add" class="onboard-add-btn">+ 계정 추가</button>
+          </article>
+
+          <article class="onboarding-block">
+            <h3 class="title-with-char"><img src="assets/chars/pink.svg" class="mini-char" alt="" /><span>합산 기록</span></h3>
+            <div id="onboard-combined-rows" class="onboard-entry-list"></div>
+            <button type="button" id="onboard-combined-add" class="onboard-add-btn">+ 합산 기록 추가</button>
+          </article>
+
+          <article class="onboarding-block onboarding-block-template" hidden>
+            <div id="onboard-entry-row-template" class="onboard-entry-row">
+              <input type="text" data-onboard-entry-name placeholder="이름" />
+              <input type="number" data-onboard-entry-amount min="0.01" step="0.01" placeholder="금액" />
+              <button type="button" data-onboard-entry-remove aria-label="행 삭제">삭제</button>
+            </div>
+            <div id="onboard-ledger-row-template" class="onboard-ledger-row">
+              <input type="text" data-onboard-ledger-name placeholder="계정 이름" />
+              <button type="button" data-onboard-ledger-remove aria-label="계정 삭제">삭제</button>
+            </div>
+            <div id="onboard-combined-row-template" class="onboard-combined-row">
+              <input type="text" data-onboard-combined-name placeholder="합산 기록 이름" />
+              <div class="onboard-combined-members" data-onboard-combined-members></div>
+              <button type="button" data-onboard-combined-remove aria-label="합산 기록 삭제">삭제</button>
+            </div>
+          </article>
+
+          <button id="onboarding-submit-btn" type="submit" class="onboarding-submit" formnovalidate onclick="window.__onboardingSubmitFallback && window.__onboardingSubmitFallback()">설정 완료</button>
+        </form>
+      </section>
+    </section>
+
     <main class="app-shell">
       <section class="quick-entry view-home">
         <div class="home-friend-stage" aria-hidden="true">
@@ -126,32 +328,53 @@
         </div>
       </div>
 
-      <section class="card setup-card view-settings" hidden>
+      <section class="card view-settings" hidden>
         <div class="section-title-row">
-          <h2>초기 금액/미납금 설정</h2>
-          <p class="hint">처음 한 번만 넣고 필요할 때 수정</p>
+          <h2>계정 유형 설정</h2>
+          <p class="hint">온보딩에서 정한 이름을 여기서 수정 가능</p>
         </div>
-        <form id="setup-form" class="setup-form" autocomplete="off">
-          <label>소비통장 초기잔액
-            <input id="setup-checking" type="number" min="0" step="0.01" />
+        <form id="profile-form" class="setup-form profile-setup-form" autocomplete="off">
+          <article class="profile-config-block">
+            <h3 class="title-with-char"><img src="assets/chars/blue.svg" class="mini-char" alt="" /><span>계정 이름</span></h3>
+            <div id="profile-ledger-rows" class="onboard-entry-list"></div>
+            <button type="button" id="profile-ledger-add" class="onboard-add-btn">+ 계정 추가</button>
+          </article>
+          <article class="profile-config-block">
+            <h3 class="title-with-char"><img src="assets/chars/pink.svg" class="mini-char" alt="" /><span>합산 기록</span></h3>
+            <div id="profile-combined-rows" class="onboard-entry-list"></div>
+            <button type="button" id="profile-combined-add" class="onboard-add-btn">+ 합산 기록 추가</button>
+          </article>
+          <label>
+            <span class="title-with-char label-title-with-char"><img src="assets/chars/green.svg" class="mini-char" alt="" /><span>통장/카드 탭 이름</span></span>
+            <input id="profile-accounts-name" type="text" />
           </label>
-          <label>세이브통장 초기잔액
-            <input id="setup-savings" type="number" min="0" step="0.01" />
-          </label>
-          <label>현금 초기잔액
-            <input id="setup-cash" type="number" min="0" step="0.01" />
-          </label>
-          <label>꽃 소비통장 초기잔액
-            <input id="setup-flower-checking" type="number" min="0" step="0.01" />
-          </label>
-          <label>꽃 현금 초기잔액
-            <input id="setup-flower-cash" type="number" min="0" step="0.01" />
-          </label>
-          <label>미납금(단일) 초기값
-            <input id="setup-card-due" type="number" min="0" step="0.01" />
-          </label>
-          <button type="submit">설정 저장</button>
+          <article class="onboarding-block-template" hidden>
+            <div id="profile-ledger-row-template" class="profile-ledger-row">
+              <input type="text" data-profile-ledger-name placeholder="계정 이름" />
+              <button type="button" data-profile-ledger-remove aria-label="계정 삭제">삭제</button>
+            </div>
+            <div id="profile-combined-row-template" class="profile-combined-row">
+              <input type="text" data-profile-combined-name placeholder="합산 기록 이름" />
+              <div class="profile-combined-members" data-profile-combined-members></div>
+              <button type="button" data-profile-combined-remove aria-label="합산 기록 삭제">삭제</button>
+            </div>
+          </article>
+          <button type="submit">유형 저장</button>
         </form>
+      </section>
+
+      <section id="settings-account-manager-card" class="card view-settings" hidden>
+        <div class="section-title-row">
+          <h2>계정별 통장/카드 관리</h2>
+          <p class="hint">계정마다 카드와 통장 목록을 별도로 관리</p>
+        </div>
+        <p id="onboarding-account-manager-note" class="hint onboarding-account-manager-note" hidden>
+          지금 모두 입력하지 않아도 괜찮아요. 나중에 <strong>통장/카드</strong> 탭에서 언제든 수정할 수 있어요.
+        </p>
+        <div id="settings-accounts-manage-grid" class="accounts-manage-grid"></div>
+        <div id="onboarding-account-manager-actions" class="onboarding-account-manager-actions" hidden>
+          <button id="onboarding-account-manager-done" type="button" class="onboarding-manager-done-btn">완료</button>
+        </div>
       </section>
 
       <section class="card scope-card view-ledger" hidden>
@@ -161,7 +384,8 @@
         <div id="scope-buttons" class="scope-buttons" role="tablist" aria-label="장부 전환">
           <button class="scope-btn active" data-scope="personal" type="button">개인 장부</button>
           <button class="scope-btn" data-scope="flower" type="button">Blessom Flower</button>
-          <button class="scope-btn" data-scope="accounts" type="button">통장</button>
+          <button class="scope-btn" data-scope="combined" type="button" hidden>총 장부</button>
+          <button class="scope-btn" data-scope="accounts" type="button">통장/카드</button>
         </div>
       </section>
 
@@ -244,15 +468,6 @@
         </div>
 
         <div class="keyword-block">
-          <h3>꽃사업 분리 키워드</h3>
-          <form id="flower-keyword-form" class="mini-form">
-            <input id="flower-keyword-input" type="text" placeholder="예: 리본, 센터피스, flower foam" />
-            <button type="submit">추가</button>
-          </form>
-          <div id="flower-keyword-list" class="keyword-list"></div>
-        </div>
-
-        <div class="keyword-block">
           <h3>카테고리 관리</h3>
           <p class="hint">카테고리 이름/키워드를 클릭형으로 쉽게 관리</p>
           <form id="category-add-form" class="mini-form">
@@ -321,14 +536,14 @@
       <section class="card sync-card view-settings" hidden>
         <div class="section-title-row">
           <h2>웹/모바일 자동 연동</h2>
-          <p class="hint">같은 Sync URL을 쓰면 두 기기 내용이 자동으로 맞춰져요. (GitHub Gist URL/ID 지원)</p>
+          <p class="hint">이 앱은 자동 연동이 기본 설정되어 있어요. 링크만 공유하면 같은 데이터가 맞춰져요.</p>
         </div>
         <form id="sync-form" class="setup-form" autocomplete="off">
           <label>Sync URL
-            <input id="sync-endpoint" type="text" placeholder="gist ID 또는 https://api.github.com/gists/..." />
+            <input id="sync-endpoint" type="text" placeholder="https://<project-ref>.supabase.co" />
           </label>
-          <label>Access Token(선택)
-            <input id="sync-token" type="password" placeholder="Bearer 토큰 (선택)" />
+          <label>Access Token(필수)
+            <input id="sync-token" type="password" placeholder="sb_publishable_..." />
           </label>
           <label>동기화 간격(초)
             <input id="sync-interval" type="number" min="10" step="5" value="30" />
@@ -356,10 +571,9 @@
       <section id="accounts-breakdown-card" class="card view-ledger scope-hidden" hidden>
         <div class="section-title-row">
           <h2>통장 한눈에 보기</h2>
-          <p class="hint">크레딧 카드/세이브 통장/현금 요약</p>
+          <p class="hint">온보딩/설정에서 입력한 계정별 카드/통장 요약</p>
         </div>
         <div id="accounts-breakdown-grid" class="accounts-breakdown-grid"></div>
-        <div id="accounts-manage-grid" class="accounts-manage-grid"></div>
       </section>
 
       <section id="goal-planner-card" class="card goal-planner-card view-ledger scope-hidden" hidden>
@@ -512,6 +726,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js"></script>
+    <script src="app.js?v=73"></script>
   </body>
 </html>

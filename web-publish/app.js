@@ -1,19 +1,23 @@
-const STORAGE_KEY = "mongle-ledger-v2";
-const LEGACY_STORAGE_KEY = "mongle-ledger-v1";
-const SETTINGS_KEY = "mongle-ledger-settings-v1";
-const FRIENDS_HIDDEN_KEY = "mongle-friends-hidden-v1";
-const SYNC_CONFIG_KEY = "mongle-sync-config-v1";
-const SYNC_META_KEY = "mongle-sync-meta-v1";
-const DEVICE_ID_KEY = "mongle-device-id-v1";
+const STORAGE_KEY = "mongle-ledger-flex-v1";
+const LEGACY_STORAGE_KEY = "mongle-ledger-flex-legacy-v0";
+const SETTINGS_KEY = "mongle-ledger-flex-settings-v1";
+const FRIENDS_HIDDEN_KEY = "mongle-ledger-flex-friends-hidden-v1";
+const SYNC_CONFIG_KEY = "mongle-ledger-flex-sync-config-v1";
+const SYNC_META_KEY = "mongle-ledger-flex-sync-meta-v1";
+const DEVICE_ID_KEY = "mongle-ledger-flex-device-id-v1";
 const SYNC_APP_VERSION = "inmypocket-sync-v1";
 const GITHUB_GIST_SYNC_FILE = "inmypocket-sync.json";
+const SUPABASE_SYNC_TABLE = "inmypocket_sync_state";
+const SUPABASE_SYNC_ROW_ID = "shared";
+const SUPABASE_DEFAULT_ENDPOINT = "https://quqjegudupmocwiuwbga.supabase.co";
+const SUPABASE_DEFAULT_PUBLISHABLE_KEY = "sb_publishable_3FBUiXSH-R2mnj1etyuifA_Tm_7ALWW";
+const SYNC_AUTO_MANAGED = true;
 const CURRENCY = "USD";
 
 const PERSONAL_ACCOUNTS = ["personalChecking", "personalSavings", "personalCash"];
 const FLOWER_ACCOUNTS = ["flowerChecking", "flowerCash"];
 const NON_TRANSFER_ACCOUNTS = [...PERSONAL_ACCOUNTS, ...FLOWER_ACCOUNTS];
 const CARD_TARGET_PREFIX = "card:";
-const DEFAULT_QUICK_CARD_NAME = "BOA Visa";
 
 const CATEGORY_COLORS = {
   Grocery: "#F6C039",
@@ -26,7 +30,6 @@ const CATEGORY_COLORS = {
   Housing: "#9F7346",
   Fun: "#E8B5B4",
   Other: "#106AA9",
-  "Blessom Flower": "#E8B5B4",
   Income: "#346D4A",
   "Account Transfer": "#106AA9",
 };
@@ -81,12 +84,23 @@ const QUICK_KIND_ORDER = [
 
 const QUICK_KIND_LABEL = {
   auto: "자동",
-  "personal-income": "수입",
-  "personal-expense": "지출",
-  "personal-cash": "현금",
-  "flower-income": "꽃 수입",
-  "flower-expense": "꽃 지출",
-  "flower-cash": "꽃 현금",
+  "personal-income": "개인 수입",
+  "personal-expense": "개인 지출",
+  "personal-cash": "개인 현금",
+  "flower-income": "Blessom Flower 수입",
+  "flower-expense": "Blessom Flower 지출",
+  "flower-cash": "Blessom Flower 현금",
+};
+
+const DEFAULT_USER_PROFILE = {
+  onboardingDone: false,
+  records: ["개인", "Blessom Flower"],
+  combinedConfigs: [],
+  personalLedgerName: "개인",
+  flowerLedgerName: "Blessom Flower",
+  accountsTabName: "통장/카드",
+  combinedEnabled: false,
+  combinedLedgerName: "총 장부",
 };
 
 const CARD_DEFAULT_COLORS = {
@@ -106,7 +120,8 @@ const CARD_DEFAULT_COLORS = {
 const SCOPE_CARD_MAP = {
   personal: ["monthly-outflow", "monthly-inflow", "monthly-net"],
   flower: ["flower-monthly-outflow", "flower-monthly-inflow", "balance-flower", "balance-flower-cash"],
-  accounts: ["balance-checking", "balance-savings", "balance-cash"],
+  combined: ["monthly-outflow", "monthly-inflow", "monthly-net"],
+  accounts: [],
 };
 
 const FRIEND_KEYS = ["friendA", "friendB", "friendC", "friendD"];
@@ -262,7 +277,6 @@ const DEFAULT_CATEGORY_LIST = [
   "Housing",
   "Fun",
   "Income",
-  "Blessom Flower",
   "Other",
 ];
 
@@ -277,9 +291,10 @@ const DEFAULT_CATEGORY_KEYWORDS = {
   Housing: ["월세", "렌트", "관리비", "전기", "수도", "인터넷", "공과금", "internet"],
   Fun: ["영화", "게임", "여행", "concert", "공연", "전시"],
   Income: ["입금", "수입", "salary", "bonus", "refund", "리워드", "reward", "cashback"],
-  "Blessom Flower": ["꽃", "꽃시장", "flower", "floral", "mayesh", "웨딩", "화병", "부케"],
   Other: [],
 };
+
+const BLOCKED_CATEGORY_NAMES = new Set(["blessom flower", "용", "yong"]);
 
 const DEFAULT_SETTINGS = {
   flowerKeywords: [
@@ -329,6 +344,7 @@ const DEFAULT_SETTINGS = {
     personalSavings: [],
     flowerChecking: [],
   },
+  accountScopedManagers: {},
   categories: [...DEFAULT_CATEGORY_LIST],
   categoryKeywords: cloneDefaults(DEFAULT_CATEGORY_KEYWORDS),
   cardDebts: [],
@@ -342,12 +358,13 @@ const DEFAULT_SETTINGS = {
   },
   savingGoals: [],
   customRules: [],
+  userProfile: cloneDefaults(DEFAULT_USER_PROFILE),
 };
 
 const DEFAULT_SYNC_CONFIG = {
-  enabled: false,
-  endpoint: "",
-  token: "",
+  enabled: true,
+  endpoint: SUPABASE_DEFAULT_ENDPOINT,
+  token: SUPABASE_DEFAULT_PUBLISHABLE_KEY,
   intervalSec: 30,
 };
 
@@ -374,6 +391,8 @@ const state = {
   recordsMonthByCard: {},
   currentEditId: null,
   donutHitRegions: [],
+  onboardingStep: 0,
+  onboardingSettingsOnly: false,
 };
 
 const syncRuntime = {
@@ -443,6 +462,10 @@ const historyListEl = document.getElementById("history-list");
 const accountsBreakdownCardEl = document.getElementById("accounts-breakdown-card");
 const accountsBreakdownGridEl = document.getElementById("accounts-breakdown-grid");
 const accountsManageGridEl = document.getElementById("accounts-manage-grid");
+const settingsAccountsManageGridEl = document.getElementById("settings-accounts-manage-grid");
+const onboardingAccountManagerNoteEl = document.getElementById("onboarding-account-manager-note");
+const onboardingAccountManagerActionsEl = document.getElementById("onboarding-account-manager-actions");
+const onboardingAccountManagerDoneEl = document.getElementById("onboarding-account-manager-done");
 const goalPlannerCardEl = document.getElementById("goal-planner-card");
 const goalFormEl = document.getElementById("goal-form");
 const goalListEl = document.getElementById("goal-list");
@@ -532,6 +555,35 @@ const syncEnabledEl = document.getElementById("sync-enabled");
 const syncNowEl = document.getElementById("sync-now");
 const syncStatusEl = document.getElementById("sync-status");
 
+const onboardingOverlayEl = document.getElementById("onboarding-overlay");
+const onboardingIntroEl = document.getElementById("onboarding-intro");
+const onboardingSetupEl = document.getElementById("onboarding-setup");
+const onboardingTitleCharEl = document.getElementById("onboarding-title-char");
+const onboardingTitleEl = document.getElementById("onboarding-title");
+const onboardingSubEl = document.getElementById("onboarding-sub");
+const onboardingNextBtnEl = document.getElementById("onboarding-next-btn");
+const onboardingFormEl = document.getElementById("onboarding-form");
+const onboardingSubmitBtnEl = document.getElementById("onboarding-submit-btn");
+const onboardLedgerRowsEl = document.getElementById("onboard-ledger-rows");
+const onboardLedgerAddEl = document.getElementById("onboard-ledger-add");
+const onboardCombinedRowsEl = document.getElementById("onboard-combined-rows");
+const onboardCombinedAddEl = document.getElementById("onboard-combined-add");
+const onboardCardRowsEl = document.getElementById("onboard-card-rows");
+const onboardBankRowsEl = document.getElementById("onboard-bank-rows");
+const onboardCardAddEl = document.getElementById("onboard-card-add");
+const onboardBankAddEl = document.getElementById("onboard-bank-add");
+const onboardEntryRowTemplateEl = document.getElementById("onboard-entry-row-template");
+const onboardLedgerRowTemplateEl = document.getElementById("onboard-ledger-row-template");
+const onboardCombinedRowTemplateEl = document.getElementById("onboard-combined-row-template");
+const profileFormEl = document.getElementById("profile-form");
+const profileLedgerRowsEl = document.getElementById("profile-ledger-rows");
+const profileLedgerAddEl = document.getElementById("profile-ledger-add");
+const profileCombinedRowsEl = document.getElementById("profile-combined-rows");
+const profileCombinedAddEl = document.getElementById("profile-combined-add");
+const profileLedgerRowTemplateEl = document.getElementById("profile-ledger-row-template");
+const profileCombinedRowTemplateEl = document.getElementById("profile-combined-row-template");
+const profileAccountsNameEl = document.getElementById("profile-accounts-name");
+
 const ruleForm = document.getElementById("rule-form");
 const ruleKeywordInput = document.getElementById("rule-keyword");
 const ruleMerchantInput = document.getElementById("rule-merchant");
@@ -540,9 +592,1074 @@ const ruleLedgerInput = document.getElementById("rule-ledger");
 const ruleKindInput = document.getElementById("rule-kind");
 const ruleListEl = document.getElementById("rule-list");
 
+const ONBOARDING_STEPS = [
+  { title: "환영합니다!", sub: "" },
+  { title: "설정을 시작해 볼까요?", sub: "" },
+  {
+    title: "사용할 계정을 설정해주세요!",
+    sub: "<span class=\"onboarding-sub-small\">‘설정’ 탭에서 언제든 변경할 수 있습니다.</span>",
+  },
+];
+const ONBOARDING_STEP_CHARS = ["assets/chars/yellow.svg", "assets/chars/blue.svg", "assets/chars/pink.svg"];
+const ONBOARDING_SKIP_INTRO_BY_DEFAULT = true;
+let onboardingTransitioning = false;
+let onboardingLastAdvanceAt = 0;
+const ONBOARDING_TRANSITION_MS = 780;
+const ONBOARDING_ADVANCE_GUARD_MS = 180;
+
+function populateOnboardingSetupRows() {
+  const profile = getUserProfile();
+  if (onboardLedgerRowsEl) {
+    onboardLedgerRowsEl.innerHTML = "";
+    const records = profile.onboardingDone && Array.isArray(profile.records) ? profile.records : [];
+    if (records.length) {
+      for (const name of records) {
+        appendOnboardLedgerRow(name);
+      }
+    } else {
+      appendOnboardLedgerRow("");
+    }
+  }
+  if (onboardCombinedRowsEl) {
+    onboardCombinedRowsEl.innerHTML = "";
+    const combined = profile.onboardingDone && Array.isArray(profile.combinedConfigs) ? profile.combinedConfigs : [];
+    if (combined.length) {
+      for (const config of combined) {
+        appendOnboardCombinedRow(config);
+      }
+    } else {
+      appendOnboardCombinedRow(null);
+    }
+  }
+}
+
+function cleanText(value, fallback = "") {
+  const text = String(value || "").trim();
+  return text || fallback;
+}
+
+function getUserProfile() {
+  const source = normalizeUserProfile(state.settings?.userProfile || {});
+  const records = Array.isArray(source.records) && source.records.length
+    ? source.records
+    : [source.personalLedgerName, source.flowerLedgerName].filter(Boolean);
+  const combinedConfigs =
+    Array.isArray(source.combinedConfigs) && source.combinedConfigs.length
+      ? source.combinedConfigs
+      : source.combinedEnabled
+        ? [{ name: source.combinedLedgerName, members: [records[0], records[1]].filter(Boolean) }]
+        : [];
+  const primaryCombined = combinedConfigs[0] || null;
+  return {
+    onboardingDone: Boolean(source.onboardingDone),
+    records,
+    combinedConfigs,
+    personalLedgerName: cleanText(records[0], DEFAULT_USER_PROFILE.personalLedgerName),
+    flowerLedgerName: cleanText(records[1], DEFAULT_USER_PROFILE.flowerLedgerName),
+    accountsTabName: cleanText(source.accountsTabName, DEFAULT_USER_PROFILE.accountsTabName),
+    combinedEnabled: Boolean(primaryCombined),
+    combinedLedgerName: cleanText(primaryCombined?.name, DEFAULT_USER_PROFILE.combinedLedgerName),
+  };
+}
+
+function getLedgerDefinitions() {
+  const profile = getUserProfile();
+  const records = Array.isArray(profile.records) && profile.records.length
+    ? profile.records
+    : [profile.personalLedgerName, profile.flowerLedgerName];
+  return records.map((name, index) => ({
+    id: index === 0 ? "personal" : index === 1 ? "flower" : `extra-${index + 1}`,
+    name,
+    accountGroup: index === 1 ? "flower" : "personal",
+  }));
+}
+
+function getLedgerNameById(ledgerId) {
+  const found = getLedgerDefinitions().find((ledger) => ledger.id === ledgerId);
+  return found?.name || cleanText(ledgerId, DEFAULT_USER_PROFILE.personalLedgerName);
+}
+
+function parseManagedType(type) {
+  const raw = String(type || "");
+  if (raw.startsWith("accountCards:")) {
+    return { kind: "accountCards", ledgerId: raw.slice("accountCards:".length) || "personal" };
+  }
+  if (raw.startsWith("accountBanks:")) {
+    return { kind: "accountBanks", ledgerId: raw.slice("accountBanks:".length) || "personal" };
+  }
+  return { kind: raw, ledgerId: "" };
+}
+
+function isCardManagerType(type) {
+  const parsed = parseManagedType(type);
+  return parsed.kind === "cardDebts" || parsed.kind === "accountCards";
+}
+
+function getAccountManagerConfigs() {
+  const ledgers = getLedgerDefinitions();
+  return ledgers.flatMap((ledger, index) => {
+    const cardAccent = PALETTE[index % PALETTE.length] || "#FC5F1F";
+    const bankAccent = PALETTE[(index + 3) % PALETTE.length] || "#346D4A";
+    return [
+      {
+        type: `accountCards:${ledger.id}`,
+        title: `${ledger.name} 카드 관리`,
+        accent: cardAccent,
+        namePlaceholder: "카드 이름",
+        amountPlaceholder: ledger.id === "personal" ? "남은 카드금" : "카드 금액",
+        emptyMessage: `등록된 ${ledger.name} 카드가 없어요.`,
+      },
+      {
+        type: `accountBanks:${ledger.id}`,
+        title: `${ledger.name} 통장 관리`,
+        accent: bankAccent,
+        namePlaceholder: "통장 이름",
+        amountPlaceholder: "잔액",
+        emptyMessage: `등록된 ${ledger.name} 통장이 없어요.`,
+      },
+    ];
+  });
+}
+
+function normalizeQuickKindValue(rawValue) {
+  const value = String(rawValue || "auto");
+  const legacyMap = {
+    "personal-income": "personal:income",
+    "personal-expense": "personal:expense",
+    "personal-cash": "personal:cash",
+    "flower-income": "flower:income",
+    "flower-expense": "flower:expense",
+    "flower-cash": "flower:cash",
+  };
+  return legacyMap[value] || value;
+}
+
+function getQuickKindValues() {
+  const values = ["auto"];
+  for (const ledger of getLedgerDefinitions()) {
+    values.push(`${ledger.id}:income`, `${ledger.id}:expense`, `${ledger.id}:cash`);
+  }
+  return values;
+}
+
+function isCombinedScope(scope) {
+  return scope === "combined" || /^combined-\d+$/.test(String(scope || ""));
+}
+
+function getCombinedScopeConfigs() {
+  const combined = Array.isArray(getUserProfile().combinedConfigs) ? getUserProfile().combinedConfigs : [];
+  return combined.map((config, index) => ({
+    ...config,
+    scope: index === 0 ? "combined" : `combined-${index + 1}`,
+  }));
+}
+
+function getCombinedConfigByScope(scope) {
+  return getCombinedScopeConfigs().find((config) => config.scope === scope) || null;
+}
+
+function getQuickKindLabel(value) {
+  const normalized = normalizeQuickKindValue(value);
+  if (normalized === "auto") {
+    return "자동";
+  }
+  const match = normalized.match(/^([^:]+):(income|expense|cash)$/);
+  if (!match) {
+    return QUICK_KIND_LABEL[value] || value;
+  }
+  const ledgerName = getLedgerNameById(match[1]);
+  const suffixMap = {
+    income: "수입",
+    expense: "지출",
+    cash: "현금",
+  };
+  return `${ledgerName} ${suffixMap[match[2]] || ""}`.trim();
+}
+
+function applyDynamicLabels() {
+  const profile = getUserProfile();
+  const ledgers = getLedgerDefinitions();
+  for (const ledger of ledgers) {
+    LEDGER_LABEL[ledger.id] = ledger.name;
+  }
+
+  LEDGER_LABEL.personal = profile.personalLedgerName;
+  LEDGER_LABEL.flower = profile.flowerLedgerName;
+
+  ACCOUNT_LABEL.personalChecking = `${profile.personalLedgerName} 소비통장`;
+  ACCOUNT_LABEL.personalSavings = `${profile.personalLedgerName} 세이브통장`;
+  ACCOUNT_LABEL.personalCash = `${profile.personalLedgerName} 현금`;
+  ACCOUNT_LABEL.flowerChecking = `${profile.flowerLedgerName} 소비통장`;
+  ACCOUNT_LABEL.flowerCash = `${profile.flowerLedgerName} 현금`;
+  ACCOUNT_LABEL.flowerMain = `${profile.flowerLedgerName} 소비통장`;
+
+  FRIEND_ACTION_LABEL["scope-personal"] = `${profile.personalLedgerName} 장부 열기`;
+  FRIEND_ACTION_LABEL["scope-flower"] = `${profile.flowerLedgerName} 장부 열기`;
+  FRIEND_ACTION_BADGE["scope-personal"] = profile.personalLedgerName;
+  FRIEND_ACTION_BADGE["scope-flower"] = profile.flowerLedgerName;
+
+  if (scopeButtons) {
+    const dynamicButtons = scopeButtons.querySelectorAll("button[data-dynamic-scope='true']");
+    for (const button of dynamicButtons) {
+      button.remove();
+    }
+    const dynamicCombinedButtons = scopeButtons.querySelectorAll("button[data-dynamic-combined='true']");
+    for (const button of dynamicCombinedButtons) {
+      button.remove();
+    }
+  }
+
+  const scopePersonal = scopeButtons?.querySelector('button[data-scope="personal"]');
+  const scopeFlower = scopeButtons?.querySelector('button[data-scope="flower"]');
+  const scopeCombined = scopeButtons?.querySelector('button[data-scope="combined"]');
+  const scopeAccounts = scopeButtons?.querySelector('button[data-scope="accounts"]');
+
+  if (scopePersonal) scopePersonal.textContent = `${profile.personalLedgerName} 장부`;
+  if (scopeFlower) scopeFlower.textContent = profile.flowerLedgerName;
+  const combinedConfigs = getCombinedScopeConfigs();
+  if (scopeCombined) {
+    const firstCombined = combinedConfigs[0] || null;
+    scopeCombined.hidden = !firstCombined;
+    scopeCombined.textContent = firstCombined?.name || profile.combinedLedgerName;
+  }
+  if (scopeButtons) {
+    const insertBefore = scopeAccounts || null;
+    const extraLedgers = ledgers.filter((ledger) => !["personal", "flower"].includes(ledger.id));
+    for (const ledger of extraLedgers) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "scope-btn";
+      button.dataset.scope = ledger.id;
+      button.dataset.dynamicScope = "true";
+      button.textContent = ledger.name;
+      scopeButtons.insertBefore(button, scopeCombined || insertBefore);
+    }
+    const extraCombined = combinedConfigs.slice(1);
+    for (const config of extraCombined) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "scope-btn";
+      button.dataset.scope = config.scope;
+      button.dataset.dynamicCombined = "true";
+      button.textContent = config.name;
+      scopeButtons.insertBefore(button, insertBefore);
+    }
+  }
+  if (scopeAccounts) scopeAccounts.textContent = profile.accountsTabName;
+
+  const availableScopes = new Set([
+    ...ledgers.map((ledger) => ledger.id),
+    "accounts",
+    ...combinedConfigs.map((config) => config.scope),
+  ]);
+  if (!availableScopes.has(state.selectedScope)) {
+    state.selectedScope = "personal";
+  }
+
+  const quickValues = getQuickKindValues();
+  const previousQuickValue = normalizeQuickKindValue(String(quickKindSelect?.value || "auto"));
+  const selectedQuickValue = quickValues.includes(previousQuickValue) ? previousQuickValue : "auto";
+
+  if (quickKindMenuEl) {
+    quickKindMenuEl.innerHTML = quickValues
+      .map(
+        (value) =>
+          `<button type="button" class="quick-kind-option" data-quick-kind-option="${escapeHtml(value)}">${escapeHtml(
+            getQuickKindLabel(value)
+          )}</button>`
+      )
+      .join("");
+  }
+
+  if (quickKindSelect) {
+    quickKindSelect.innerHTML = quickValues
+      .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(getQuickKindLabel(value))}</option>`)
+      .join("");
+    quickKindSelect.value = selectedQuickValue;
+  }
+
+  if (ruleLedgerInput) {
+    const previous = String(ruleLedgerInput.value || "auto");
+    const ledgerOptions = getLedgerDefinitions()
+      .map((ledger) => `<option value="${escapeHtml(ledger.id)}">${escapeHtml(ledger.name)} 계정</option>`)
+      .join("");
+    ruleLedgerInput.innerHTML = `<option value="auto">자동</option>${ledgerOptions}`;
+    const valid = previous === "auto" || getLedgerDefinitions().some((ledger) => ledger.id === previous);
+    ruleLedgerInput.value = valid ? previous : "auto";
+  }
+
+  if (editLedgerEl) {
+    const previous = String(editLedgerEl.value || "personal");
+    const ledgerOptions = getLedgerDefinitions()
+      .map((ledger) => `<option value="${escapeHtml(ledger.id)}">${escapeHtml(ledger.name)}</option>`)
+      .join("");
+    editLedgerEl.innerHTML = ledgerOptions;
+    const valid = getLedgerDefinitions().some((ledger) => ledger.id === previous);
+    editLedgerEl.value = valid ? previous : "personal";
+  }
+
+  const updateStatLabel = (cardKey, text) => {
+    const card = document.querySelector(`.stat-card[data-card="${cardKey}"]`);
+    if (!card) return;
+    const label = card.querySelector(".label");
+    if (label) {
+      label.textContent = text;
+    }
+  };
+
+  updateStatLabel("monthly-outflow", `${profile.personalLedgerName} 이번 달 지출`);
+  updateStatLabel("monthly-inflow", `${profile.personalLedgerName} 이번 달 입금`);
+  updateStatLabel("monthly-net", `${profile.personalLedgerName} 이번 달 잔액 변화`);
+  updateStatLabel("balance-savings", `${profile.personalLedgerName} 세이브통장`);
+  updateStatLabel("balance-cash", `${profile.personalLedgerName} 현금`);
+  updateStatLabel("flower-monthly-outflow", `${profile.flowerLedgerName} 이번 달 지출`);
+  updateStatLabel("flower-monthly-inflow", `${profile.flowerLedgerName} 이번 달 입금`);
+  updateStatLabel("balance-flower", `${profile.flowerLedgerName} 소비통장`);
+  updateStatLabel("balance-flower-cash", `${profile.flowerLedgerName} 현금`);
+
+  RECORD_MANAGER_CONFIG["balance-savings"].title = `${profile.personalLedgerName} 세이브통장 목록 관리`;
+  RECORD_MANAGER_CONFIG["balance-savings"].emptyMessage = `등록된 ${profile.personalLedgerName} 세이브통장이 없어요.`;
+  RECORD_MANAGER_CONFIG["balance-flower"].title = `${profile.flowerLedgerName} 소비통장 목록 관리`;
+  RECORD_MANAGER_CONFIG["balance-flower"].emptyMessage = `등록된 ${profile.flowerLedgerName} 소비통장이 없어요.`;
+}
+
+function parseNamedAmountLines(raw, { liability = false } = {}) {
+  const lines = String(raw || "")
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const items = [];
+  for (const line of lines) {
+    const matched = line.match(/^(.+?)[,:]\s*([-+]?\d+(?:[.,]\d+)?)$/);
+    if (!matched) {
+      continue;
+    }
+    const name = cleanText(matched[1]);
+    const amount = liability ? normalizeLiabilityAmount(matched[2]) : normalizeAmount(matched[2]);
+    if (!name || amount <= 0) {
+      continue;
+    }
+    items.push({ id: createId(), name, amount: roundMoney(amount) });
+  }
+  return items;
+}
+
+function createOnboardEntryRow(name = "", amount = "") {
+  if (!onboardEntryRowTemplateEl) {
+    return null;
+  }
+  const row = onboardEntryRowTemplateEl.cloneNode(true);
+  row.removeAttribute("id");
+  row.hidden = false;
+  const nameInput = row.querySelector("input[data-onboard-entry-name]");
+  const amountInput = row.querySelector("input[data-onboard-entry-amount]");
+  if (nameInput) {
+    nameInput.value = name;
+  }
+  if (amountInput) {
+    amountInput.value = amount ? String(amount) : "";
+  }
+  return row;
+}
+
+function appendOnboardEntryRow(type, name = "", amount = "") {
+  const container = type === "card" ? onboardCardRowsEl : onboardBankRowsEl;
+  if (!container) {
+    return;
+  }
+  const row = createOnboardEntryRow(name, amount);
+  if (!row) {
+    return;
+  }
+  container.appendChild(row);
+}
+
+function ensureOnboardEntryRowExists(type) {
+  const container = type === "card" ? onboardCardRowsEl : onboardBankRowsEl;
+  if (!container) {
+    return;
+  }
+  if (!container.querySelector(".onboard-entry-row")) {
+    appendOnboardEntryRow(type);
+  }
+}
+
+function collectOnboardEntryRows(container, { liability = false } = {}) {
+  if (!container) {
+    return [];
+  }
+  const rows = Array.from(container.querySelectorAll(".onboard-entry-row"));
+  const items = [];
+  for (const row of rows) {
+    const nameInput = row.querySelector("input[data-onboard-entry-name]");
+    const amountInput = row.querySelector("input[data-onboard-entry-amount]");
+    const name = cleanText(nameInput?.value, "");
+    const rawAmount = String(amountInput?.value || "");
+    const amount = liability ? normalizeLiabilityAmount(rawAmount) : normalizeAmount(rawAmount);
+    if (!name || amount <= 0) {
+      continue;
+    }
+    items.push({ id: createId(), name, amount: roundMoney(amount) });
+  }
+  return items;
+}
+
+function handleOnboardEntryRemove(event) {
+  const removeButton = event.target.closest("button[data-onboard-entry-remove]");
+  if (!removeButton) {
+    return;
+  }
+  const row = removeButton.closest(".onboard-entry-row");
+  const container = removeButton.closest(".onboard-entry-list");
+  if (!row || !container) {
+    return;
+  }
+  const rows = container.querySelectorAll(".onboard-entry-row");
+  if (rows.length <= 1) {
+    const nameInput = row.querySelector("input[data-onboard-entry-name]");
+    const amountInput = row.querySelector("input[data-onboard-entry-amount]");
+    if (nameInput) nameInput.value = "";
+    if (amountInput) amountInput.value = "";
+    return;
+  }
+  row.remove();
+}
+
+function createOnboardLedgerRow(name = "") {
+  if (!onboardLedgerRowTemplateEl) {
+    return null;
+  }
+  const row = onboardLedgerRowTemplateEl.cloneNode(true);
+  row.removeAttribute("id");
+  row.hidden = false;
+  row.dataset.recordId = createId();
+  const input = row.querySelector("input[data-onboard-ledger-name]");
+  if (input) {
+    input.value = name;
+  }
+  return row;
+}
+
+function appendOnboardLedgerRow(name = "") {
+  if (!onboardLedgerRowsEl) {
+    return;
+  }
+  const row = createOnboardLedgerRow(name);
+  if (!row) {
+    return;
+  }
+  onboardLedgerRowsEl.appendChild(row);
+  rebuildOnboardCombinedMemberOptions();
+}
+
+function collectOnboardLedgerRows() {
+  if (!onboardLedgerRowsEl) {
+    return [];
+  }
+  const rows = Array.from(onboardLedgerRowsEl.querySelectorAll(".onboard-ledger-row"));
+  return rows
+    .map((row) => {
+      const input = row.querySelector("input[data-onboard-ledger-name]");
+      return {
+        id: String(row.dataset.recordId || createId()),
+        name: cleanText(input?.value, ""),
+      };
+    })
+    .filter((row) => row.name);
+}
+
+function handleOnboardLedgerRemove(event) {
+  const button = event.target.closest("button[data-onboard-ledger-remove]");
+  if (!button || !onboardLedgerRowsEl) {
+    return;
+  }
+  const row = button.closest(".onboard-ledger-row");
+  if (!row) {
+    return;
+  }
+  const rows = onboardLedgerRowsEl.querySelectorAll(".onboard-ledger-row");
+  if (rows.length <= 1) {
+    const input = row.querySelector("input[data-onboard-ledger-name]");
+    if (input) {
+      input.value = "";
+    }
+    return;
+  }
+  row.remove();
+  rebuildOnboardCombinedMemberOptions();
+}
+
+function createOnboardCombinedRow(config = null) {
+  if (!onboardCombinedRowTemplateEl) {
+    return null;
+  }
+  const row = onboardCombinedRowTemplateEl.cloneNode(true);
+  row.removeAttribute("id");
+  row.hidden = false;
+  const nameInput = row.querySelector("input[data-onboard-combined-name]");
+  if (nameInput) {
+    nameInput.value = cleanText(config?.name, "");
+  }
+  row.dataset.memberNames = Array.isArray(config?.members) ? config.members.join("||") : "";
+  return row;
+}
+
+function appendOnboardCombinedRow(config = null) {
+  if (!onboardCombinedRowsEl) {
+    return;
+  }
+  const row = createOnboardCombinedRow(config);
+  if (!row) {
+    return;
+  }
+  onboardCombinedRowsEl.appendChild(row);
+  rebuildOnboardCombinedMemberOptions();
+}
+
+function rebuildOnboardCombinedMemberOptions() {
+  if (!onboardCombinedRowsEl) {
+    return;
+  }
+  const ledgers = collectOnboardLedgerRows();
+  const ledgerById = new Map(ledgers.map((item) => [item.id, item.name]));
+  const combinedRows = onboardCombinedRowsEl.querySelectorAll(".onboard-combined-row");
+  for (const row of combinedRows) {
+    const membersWrap = row.querySelector("[data-onboard-combined-members]");
+    if (!membersWrap) {
+      continue;
+    }
+    const previousIds = new Set(
+      Array.from(membersWrap.querySelectorAll("input[type='checkbox']:checked")).map((el) => String(el.value || ""))
+    );
+    const previousNames = String(row.dataset.memberNames || "")
+      .split("||")
+      .map((name) => cleanText(name, ""))
+      .filter(Boolean);
+
+    membersWrap.innerHTML = "";
+    for (const ledger of ledgers) {
+      const label = document.createElement("label");
+      label.className = "onboard-member-chip";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = ledger.id;
+      if (previousIds.has(ledger.id) || previousNames.includes(ledger.name)) {
+        input.checked = true;
+      }
+      const span = document.createElement("span");
+      span.textContent = ledger.name;
+      label.appendChild(input);
+      label.appendChild(span);
+      membersWrap.appendChild(label);
+    }
+    row.dataset.memberNames = Array.from(previousIds)
+      .map((id) => ledgerById.get(id))
+      .filter(Boolean)
+      .join("||");
+  }
+}
+
+function collectOnboardCombinedConfigs() {
+  if (!onboardCombinedRowsEl) {
+    return [];
+  }
+  const ledgerRows = collectOnboardLedgerRows();
+  const ledgerById = new Map(ledgerRows.map((row) => [row.id, row.name]));
+  const rows = Array.from(onboardCombinedRowsEl.querySelectorAll(".onboard-combined-row"));
+  return rows
+    .map((row) => {
+      const nameInput = row.querySelector("input[data-onboard-combined-name]");
+      const memberIds = Array.from(row.querySelectorAll("[data-onboard-combined-members] input:checked")).map((el) =>
+        String(el.value || "")
+      );
+      const members = memberIds.map((id) => ledgerById.get(id)).filter(Boolean);
+      return {
+        name: cleanText(nameInput?.value, ""),
+        members,
+      };
+    })
+    .filter((cfg) => cfg.name && cfg.members.length >= 2);
+}
+
+function handleOnboardCombinedRemove(event) {
+  const button = event.target.closest("button[data-onboard-combined-remove]");
+  if (!button || !onboardCombinedRowsEl) {
+    return;
+  }
+  const row = button.closest(".onboard-combined-row");
+  if (!row) {
+    return;
+  }
+  const rows = onboardCombinedRowsEl.querySelectorAll(".onboard-combined-row");
+  if (rows.length <= 1) {
+    const nameInput = row.querySelector("input[data-onboard-combined-name]");
+    if (nameInput) {
+      nameInput.value = "";
+    }
+    row.querySelectorAll("[data-onboard-combined-members] input").forEach((input) => {
+      input.checked = false;
+    });
+    return;
+  }
+  row.remove();
+}
+
+function createProfileLedgerRow(name = "") {
+  if (!profileLedgerRowTemplateEl) {
+    return null;
+  }
+  const row = profileLedgerRowTemplateEl.cloneNode(true);
+  row.removeAttribute("id");
+  row.hidden = false;
+  row.dataset.recordId = createId();
+  const input = row.querySelector("input[data-profile-ledger-name]");
+  if (input) {
+    input.value = name;
+  }
+  return row;
+}
+
+function appendProfileLedgerRow(name = "") {
+  if (!profileLedgerRowsEl) {
+    return;
+  }
+  const row = createProfileLedgerRow(name);
+  if (!row) {
+    return;
+  }
+  profileLedgerRowsEl.appendChild(row);
+  rebuildProfileCombinedMemberOptions();
+}
+
+function collectProfileLedgerRows() {
+  if (!profileLedgerRowsEl) {
+    return [];
+  }
+  const rows = Array.from(profileLedgerRowsEl.querySelectorAll(".profile-ledger-row"));
+  return rows
+    .map((row) => {
+      const input = row.querySelector("input[data-profile-ledger-name]");
+      return {
+        id: String(row.dataset.recordId || createId()),
+        name: cleanText(input?.value, ""),
+      };
+    })
+    .filter((row) => row.name);
+}
+
+function handleProfileLedgerRemove(event) {
+  const button = event.target.closest("button[data-profile-ledger-remove]");
+  if (!button || !profileLedgerRowsEl) {
+    return;
+  }
+  const row = button.closest(".profile-ledger-row");
+  if (!row) {
+    return;
+  }
+  const rows = profileLedgerRowsEl.querySelectorAll(".profile-ledger-row");
+  if (rows.length <= 1) {
+    const input = row.querySelector("input[data-profile-ledger-name]");
+    if (input) {
+      input.value = "";
+    }
+    return;
+  }
+  row.remove();
+  rebuildProfileCombinedMemberOptions();
+}
+
+function createProfileCombinedRow(config = null) {
+  if (!profileCombinedRowTemplateEl) {
+    return null;
+  }
+  const row = profileCombinedRowTemplateEl.cloneNode(true);
+  row.removeAttribute("id");
+  row.hidden = false;
+  const nameInput = row.querySelector("input[data-profile-combined-name]");
+  if (nameInput) {
+    nameInput.value = cleanText(config?.name, "");
+  }
+  row.dataset.memberNames = Array.isArray(config?.members) ? config.members.join("||") : "";
+  return row;
+}
+
+function appendProfileCombinedRow(config = null) {
+  if (!profileCombinedRowsEl) {
+    return;
+  }
+  const row = createProfileCombinedRow(config);
+  if (!row) {
+    return;
+  }
+  profileCombinedRowsEl.appendChild(row);
+  rebuildProfileCombinedMemberOptions();
+}
+
+function rebuildProfileCombinedMemberOptions() {
+  if (!profileCombinedRowsEl) {
+    return;
+  }
+  const ledgers = collectProfileLedgerRows();
+  const ledgerById = new Map(ledgers.map((item) => [item.id, item.name]));
+  const combinedRows = profileCombinedRowsEl.querySelectorAll(".profile-combined-row");
+  for (const row of combinedRows) {
+    const membersWrap = row.querySelector("[data-profile-combined-members]");
+    if (!membersWrap) {
+      continue;
+    }
+    const previousIds = new Set(
+      Array.from(membersWrap.querySelectorAll("input[type='checkbox']:checked")).map((el) => String(el.value || ""))
+    );
+    const previousNames = String(row.dataset.memberNames || "")
+      .split("||")
+      .map((name) => cleanText(name, ""))
+      .filter(Boolean);
+
+    membersWrap.innerHTML = "";
+    for (const ledger of ledgers) {
+      const label = document.createElement("label");
+      label.className = "profile-member-chip";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = ledger.id;
+      if (previousIds.has(ledger.id) || previousNames.includes(ledger.name)) {
+        input.checked = true;
+      }
+      const span = document.createElement("span");
+      span.textContent = ledger.name;
+      label.appendChild(input);
+      label.appendChild(span);
+      membersWrap.appendChild(label);
+    }
+    row.dataset.memberNames = Array.from(previousIds)
+      .map((id) => ledgerById.get(id))
+      .filter(Boolean)
+      .join("||");
+  }
+}
+
+function collectProfileCombinedConfigs() {
+  if (!profileCombinedRowsEl) {
+    return [];
+  }
+  const ledgerRows = collectProfileLedgerRows();
+  const ledgerById = new Map(ledgerRows.map((row) => [row.id, row.name]));
+  const rows = Array.from(profileCombinedRowsEl.querySelectorAll(".profile-combined-row"));
+  return rows
+    .map((row) => {
+      const nameInput = row.querySelector("input[data-profile-combined-name]");
+      const memberIds = Array.from(row.querySelectorAll("[data-profile-combined-members] input:checked")).map((el) =>
+        String(el.value || "")
+      );
+      const members = memberIds.map((id) => ledgerById.get(id)).filter(Boolean);
+      return {
+        name: cleanText(nameInput?.value, ""),
+        members,
+      };
+    })
+    .filter((cfg) => cfg.name && cfg.members.length >= 2);
+}
+
+function handleProfileCombinedRemove(event) {
+  const button = event.target.closest("button[data-profile-combined-remove]");
+  if (!button || !profileCombinedRowsEl) {
+    return;
+  }
+  const row = button.closest(".profile-combined-row");
+  if (!row) {
+    return;
+  }
+  const rows = profileCombinedRowsEl.querySelectorAll(".profile-combined-row");
+  if (rows.length <= 1) {
+    const nameInput = row.querySelector("input[data-profile-combined-name]");
+    if (nameInput) {
+      nameInput.value = "";
+    }
+    row.querySelectorAll("[data-profile-combined-members] input").forEach((input) => {
+      input.checked = false;
+    });
+    return;
+  }
+  row.remove();
+}
+
+function renderOnboardingStep() {
+  if (!onboardingTitleEl || !onboardingSubEl) {
+    return;
+  }
+  const index = Math.max(0, Math.min(state.onboardingStep, ONBOARDING_STEPS.length - 1));
+  const step = ONBOARDING_STEPS[index];
+  onboardingTitleEl.textContent = step.title;
+  onboardingSubEl.innerHTML = step.sub || "";
+  if (onboardingTitleCharEl) {
+    onboardingTitleCharEl.src = ONBOARDING_STEP_CHARS[index] || ONBOARDING_STEP_CHARS[0];
+  }
+}
+
+function openOnboarding() {
+  if (!onboardingOverlayEl || !onboardingIntroEl || !onboardingSetupEl) {
+    return;
+  }
+  onboardingTransitioning = false;
+  onboardingLastAdvanceAt = 0;
+  state.currentView = "home";
+  applyCurrentView();
+  state.onboardingStep = 0;
+  onboardingOverlayEl.hidden = false;
+  onboardingOverlayEl.classList.remove("show-setup");
+  onboardingIntroEl.hidden = false;
+  onboardingIntroEl.classList.remove("is-transitioning", "is-hiding");
+  onboardingSetupEl.hidden = true;
+  document.body.classList.add("onboarding-active");
+  renderOnboardingStep();
+  const params = new URLSearchParams(window.location.search);
+  const shouldSkipIntro =
+    params.get("forceSetup") === "1" ||
+    (ONBOARDING_SKIP_INTRO_BY_DEFAULT && params.get("showIntro") !== "1");
+  if (shouldSkipIntro) {
+    onboardingIntroEl.hidden = true;
+    onboardingSetupEl.hidden = false;
+    onboardingOverlayEl.classList.add("show-setup");
+    populateOnboardingSetupRows();
+  }
+}
+
+function openOnboardingForm() {
+  if (!onboardingIntroEl || !onboardingSetupEl) {
+    return;
+  }
+  if (onboardingTransitioning) {
+    return;
+  }
+  onboardingTransitioning = true;
+  onboardingIntroEl.classList.remove("is-transitioning");
+  onboardingIntroEl.classList.add("is-hiding");
+
+  window.setTimeout(() => {
+    onboardingIntroEl.hidden = true;
+    onboardingIntroEl.classList.remove("is-hiding");
+    onboardingSetupEl.hidden = false;
+    if (onboardingOverlayEl) {
+      onboardingOverlayEl.classList.add("show-setup");
+    }
+    populateOnboardingSetupRows();
+    onboardingTransitioning = false;
+  }, ONBOARDING_TRANSITION_MS);
+}
+
+function closeOnboarding() {
+  if (!onboardingOverlayEl) {
+    return;
+  }
+  onboardingOverlayEl.hidden = true;
+  onboardingOverlayEl.classList.remove("show-setup");
+  onboardingTransitioning = false;
+  if (onboardingIntroEl) {
+    onboardingIntroEl.classList.remove("is-transitioning", "is-hiding");
+  }
+  document.body.classList.remove("onboarding-active");
+}
+
+function advanceOnboardingStep(event) {
+  if (event && typeof event.preventDefault === "function") {
+    event.preventDefault();
+  }
+  if (event && typeof event.stopPropagation === "function") {
+    event.stopPropagation();
+  }
+  if (!onboardingOverlayEl || onboardingOverlayEl.hidden || !onboardingIntroEl) {
+    return;
+  }
+  const now = Date.now();
+  if (now - onboardingLastAdvanceAt < ONBOARDING_ADVANCE_GUARD_MS) {
+    return;
+  }
+  onboardingLastAdvanceAt = now;
+  if (onboardingTransitioning) {
+    return;
+  }
+  const nextStep = state.onboardingStep + 1;
+  if (nextStep >= ONBOARDING_STEPS.length) {
+    openOnboardingForm();
+    return;
+  }
+  onboardingTransitioning = true;
+  onboardingIntroEl.classList.add("is-transitioning");
+  window.setTimeout(() => {
+    state.onboardingStep = nextStep;
+    renderOnboardingStep();
+    onboardingIntroEl.classList.remove("is-transitioning");
+    onboardingTransitioning = false;
+  }, ONBOARDING_TRANSITION_MS);
+}
+
+function handleOnboardingIntroClick(event) {
+  advanceOnboardingStep(event);
+}
+
+function handleOnboardingOverlayTap(event) {
+  if (!onboardingOverlayEl || onboardingOverlayEl.hidden || !onboardingIntroEl || onboardingIntroEl.hidden) {
+    return;
+  }
+  if (onboardingSetupEl && !onboardingSetupEl.hidden && onboardingSetupEl.contains(event.target)) {
+    return;
+  }
+  advanceOnboardingStep(event);
+}
+
+function handleOnboardingIntroKeydown(event) {
+  if (!event) {
+    return;
+  }
+  if (event.key === "Enter" || event.key === " ") {
+    advanceOnboardingStep(event);
+  }
+}
+
+window.__goOnboardingNext = (event) => {
+  advanceOnboardingStep(event);
+};
+
+function handleOnboardingSubmit(event) {
+  event.preventDefault();
+  let finished = false;
+  try {
+    const recordRows = collectOnboardLedgerRows();
+    const records = recordRows.length
+      ? recordRows.map((row) => row.name)
+      : [DEFAULT_USER_PROFILE.personalLedgerName, DEFAULT_USER_PROFILE.flowerLedgerName];
+    const personalName = cleanText(records[0], DEFAULT_USER_PROFILE.personalLedgerName);
+    const flowerName = cleanText(records[1], DEFAULT_USER_PROFILE.flowerLedgerName);
+    const combinedConfigs = collectOnboardCombinedConfigs();
+    const combinedEnabled = combinedConfigs.length > 0;
+    const combinedName = cleanText(combinedConfigs[0]?.name, DEFAULT_USER_PROFILE.combinedLedgerName);
+
+    state.settings.userProfile = {
+      onboardingDone: true,
+      records,
+      combinedConfigs,
+      personalLedgerName: personalName,
+      flowerLedgerName: flowerName,
+      accountsTabName: DEFAULT_USER_PROFILE.accountsTabName,
+      combinedEnabled,
+      combinedLedgerName: combinedName,
+    };
+
+    const nameTokens = uniqueStrings(
+      `${flowerName} ${flowerName.replace(/[^a-zA-Z0-9가-힣\s]/g, " ")}`.split(/\s+/)
+    ).filter((token) => token.length >= 2);
+    if (nameTokens.length) {
+      state.settings.flowerKeywords = uniqueStrings([...(state.settings.flowerKeywords || []), ...nameTokens]);
+    }
+
+    saveSettings();
+    applyDynamicLabels();
+    closeOnboarding();
+    syncSetupForm();
+    renderQuickAccountToggle();
+    renderQuickKindPicker();
+    renderQuickCardOptions();
+    renderQuickCategoryToggle();
+    render();
+    state.onboardingSettingsOnly = true;
+    setCurrentView("settings");
+    window.requestAnimationFrame(() => {
+      settingsAccountsManageGridEl?.closest(".card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    if (parserPreview) {
+      parserPreview.textContent = "첫 설정 저장 완료. 다음으로 계정별 통장/카드를 설정해주세요.";
+    }
+    finished = true;
+  } catch (error) {
+    console.error("onboarding submit failed", error);
+    if (parserPreview) {
+      parserPreview.textContent = "설정 저장 중 오류가 발생했어요. 다시 눌러주세요.";
+    }
+  } finally {
+    if (!finished) {
+      closeOnboarding();
+      setCurrentView("settings");
+    }
+  }
+}
+
+function syncProfileForm() {
+  if (!profileFormEl || !profileAccountsNameEl || !profileLedgerRowsEl || !profileCombinedRowsEl) {
+    return;
+  }
+  const profile = getUserProfile();
+  profileAccountsNameEl.value = profile.accountsTabName;
+
+  profileLedgerRowsEl.innerHTML = "";
+  const records = profile.onboardingDone && Array.isArray(profile.records) ? profile.records : [];
+  if (records.length) {
+    for (const name of records) {
+      appendProfileLedgerRow(name);
+    }
+  } else {
+    appendProfileLedgerRow("");
+  }
+
+  profileCombinedRowsEl.innerHTML = "";
+  const combined = profile.onboardingDone && Array.isArray(profile.combinedConfigs) ? profile.combinedConfigs : [];
+  if (combined.length) {
+    for (const config of combined) {
+      appendProfileCombinedRow(config);
+    }
+  } else {
+    appendProfileCombinedRow(null);
+  }
+}
+
+function handleOnboardingAccountManagerDone() {
+  state.onboardingSettingsOnly = false;
+  setCurrentView("home");
+  if (parserPreview) {
+    parserPreview.textContent = "나머지 설정은 설정 탭에서 언제든 수정할 수 있어요.";
+  }
+}
+
+function handleProfileFormSubmit(event) {
+  event.preventDefault();
+  const recordRows = collectProfileLedgerRows();
+  const records = recordRows.length
+    ? recordRows.map((row) => row.name)
+    : [DEFAULT_USER_PROFILE.personalLedgerName, DEFAULT_USER_PROFILE.flowerLedgerName];
+  const personalName = cleanText(records[0], DEFAULT_USER_PROFILE.personalLedgerName);
+  const flowerName = cleanText(records[1], DEFAULT_USER_PROFILE.flowerLedgerName);
+  const combinedConfigs = collectProfileCombinedConfigs();
+  const combinedEnabled = combinedConfigs.length > 0;
+  const combinedName = cleanText(combinedConfigs[0]?.name, DEFAULT_USER_PROFILE.combinedLedgerName);
+  const nextProfile = {
+    onboardingDone: true,
+    records,
+    combinedConfigs,
+    personalLedgerName: personalName,
+    flowerLedgerName: flowerName,
+    accountsTabName: cleanText(profileAccountsNameEl?.value, DEFAULT_USER_PROFILE.accountsTabName),
+    combinedEnabled,
+    combinedLedgerName: combinedName,
+  };
+  state.settings.userProfile = normalizeUserProfile(nextProfile);
+  saveSettings();
+  applyDynamicLabels();
+  applyFriendShortcuts();
+  renderQuickKindPicker();
+  renderQuickAccountToggle();
+  render();
+  parserPreview.textContent = "계정 유형 설정을 저장했어요.";
+}
+
 init();
 
 function init() {
+  const bootParams = new URLSearchParams(window.location.search);
+  const bootView = String(bootParams.get("view") || "").trim();
+  if (["home", "ledger", "settings"].includes(bootView)) {
+    state.currentView = bootView;
+  }
+
   quickForm.addEventListener("submit", handleSubmit);
   quickInput.addEventListener("input", handlePreview);
   if (quickKindSelect) {
@@ -612,6 +1729,13 @@ function init() {
     accountsManageGridEl.addEventListener("submit", handleAccountsManagerSubmit);
     accountsManageGridEl.addEventListener("click", handleAccountsManagerAction);
   }
+  if (settingsAccountsManageGridEl) {
+    settingsAccountsManageGridEl.addEventListener("submit", handleAccountsManagerSubmit);
+    settingsAccountsManageGridEl.addEventListener("click", handleAccountsManagerAction);
+  }
+  if (onboardingAccountManagerDoneEl) {
+    onboardingAccountManagerDoneEl.addEventListener("click", handleOnboardingAccountManagerDone);
+  }
   if (friendLayer) {
     friendLayer.addEventListener("click", handleFriendAction);
   }
@@ -652,9 +1776,95 @@ function init() {
   if (setupForm) {
     setupForm.addEventListener("submit", handleSetupSubmit);
   }
+  if (onboardingIntroEl) {
+    onboardingIntroEl.addEventListener("click", handleOnboardingIntroClick);
+    onboardingIntroEl.addEventListener("touchend", handleOnboardingIntroClick, { passive: false });
+    onboardingIntroEl.addEventListener("keydown", handleOnboardingIntroKeydown);
+  }
+  if (onboardingNextBtnEl) {
+    onboardingNextBtnEl.addEventListener("click", handleOnboardingIntroClick);
+    onboardingNextBtnEl.addEventListener("touchend", handleOnboardingIntroClick, { passive: false });
+  }
+  if (onboardingOverlayEl) {
+    onboardingOverlayEl.addEventListener("click", handleOnboardingOverlayTap);
+    onboardingOverlayEl.addEventListener("touchend", handleOnboardingOverlayTap, { passive: false });
+  }
+  if (onboardingFormEl) {
+    onboardingFormEl.noValidate = true;
+    onboardingFormEl.addEventListener("submit", handleOnboardingSubmit);
+  }
+  if (onboardingSubmitBtnEl) {
+    onboardingSubmitBtnEl.addEventListener("click", (event) => {
+      event.preventDefault();
+      handleOnboardingSubmit(event);
+    });
+  }
+  if (onboardLedgerAddEl) {
+    onboardLedgerAddEl.addEventListener("click", () => {
+      appendOnboardLedgerRow("");
+      const rows = onboardLedgerRowsEl?.querySelectorAll(".onboard-ledger-row");
+      const lastInput = rows && rows.length
+        ? rows[rows.length - 1].querySelector("input[data-onboard-ledger-name]")
+        : null;
+      if (lastInput) {
+        lastInput.focus();
+      }
+    });
+  }
+  if (onboardCombinedAddEl) {
+    onboardCombinedAddEl.addEventListener("click", () => appendOnboardCombinedRow(null));
+  }
+  if (onboardCardAddEl) {
+    onboardCardAddEl.addEventListener("click", () => appendOnboardEntryRow("card"));
+  }
+  if (onboardBankAddEl) {
+    onboardBankAddEl.addEventListener("click", () => appendOnboardEntryRow("bank"));
+  }
+  if (onboardLedgerRowsEl) {
+    onboardLedgerRowsEl.addEventListener("click", handleOnboardLedgerRemove);
+    onboardLedgerRowsEl.addEventListener("input", () => rebuildOnboardCombinedMemberOptions());
+  }
+  if (onboardCombinedRowsEl) {
+    onboardCombinedRowsEl.addEventListener("click", handleOnboardCombinedRemove);
+  }
+  if (onboardCardRowsEl) {
+    onboardCardRowsEl.addEventListener("click", handleOnboardEntryRemove);
+  }
+  if (onboardBankRowsEl) {
+    onboardBankRowsEl.addEventListener("click", handleOnboardEntryRemove);
+  }
+  if (profileFormEl) {
+    profileFormEl.addEventListener("submit", handleProfileFormSubmit);
+  }
+  if (profileLedgerAddEl) {
+    profileLedgerAddEl.addEventListener("click", () => {
+      appendProfileLedgerRow("");
+      const rows = profileLedgerRowsEl?.querySelectorAll(".profile-ledger-row");
+      const lastInput = rows && rows.length
+        ? rows[rows.length - 1].querySelector("input[data-profile-ledger-name]")
+        : null;
+      if (lastInput) {
+        lastInput.focus();
+      }
+    });
+  }
+  if (profileCombinedAddEl) {
+    profileCombinedAddEl.addEventListener("click", () => appendProfileCombinedRow(null));
+  }
+  if (profileLedgerRowsEl) {
+    profileLedgerRowsEl.addEventListener("click", handleProfileLedgerRemove);
+    profileLedgerRowsEl.addEventListener("input", () => rebuildProfileCombinedMemberOptions());
+  }
+  if (profileCombinedRowsEl) {
+    profileCombinedRowsEl.addEventListener("click", handleProfileCombinedRemove);
+  }
 
-  flowerKeywordForm.addEventListener("submit", handleFlowerKeywordSubmit);
-  flowerKeywordListEl.addEventListener("click", handleFlowerKeywordRemove);
+  if (flowerKeywordForm) {
+    flowerKeywordForm.addEventListener("submit", handleFlowerKeywordSubmit);
+  }
+  if (flowerKeywordListEl) {
+    flowerKeywordListEl.addEventListener("click", handleFlowerKeywordRemove);
+  }
   if (categoryManageTabsEl) {
     categoryManageTabsEl.addEventListener("click", handleCategoryManageTabClick);
   }
@@ -730,7 +1940,8 @@ function init() {
       event.preventDefault();
       if (!ledgerButton.disabled) {
         const value = String(ledgerButton.dataset.editLedger || "");
-        if (["personal", "flower"].includes(value)) {
+        const validLedgers = new Set(getLedgerDefinitions().map((ledger) => ledger.id));
+        if (validLedgers.has(value)) {
           editLedgerEl.value = value;
           syncEditFormMode();
         }
@@ -745,24 +1956,30 @@ function init() {
   window.addEventListener("resize", () => render());
 
   if ("serviceWorker" in navigator) {
+    const isLocalDev = ["127.0.0.1", "localhost"].includes(window.location.hostname);
+    if (isLocalDev) {
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+        .catch(() => {});
+    } else {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(() => {});
     });
+    }
   }
 
   initScrollFriends();
+  applyDynamicLabels();
   applyFriendLayerVisibility();
   applyFriendShortcuts();
   initializeSyncRuntime();
-  if (ensureDefaultQuickCardItem()) {
-    saveSettings();
-    state.settings = loadSettings();
-  }
   applyCurrentView();
   setAllFriendMenus(false);
   closeRecordsPage();
   closeEditModal();
   syncSetupForm();
+  syncProfileForm();
   renderQuickAccountToggle();
   syncQuickAccountToggleState();
   renderQuickKindPicker();
@@ -772,6 +1989,11 @@ function init() {
     goalYearsEl.value = "1";
   }
   render();
+  const forceOnboarding = bootParams.get("forceSetup") === "1" || bootParams.get("forceOnboarding") === "1";
+  const profile = getUserProfile();
+  if (forceOnboarding || !profile.onboardingDone) {
+    openOnboarding();
+  }
   startSyncPolling();
   if (syncRuntime.config.enabled) {
     triggerSync({ reason: "startup", urgent: true });
@@ -789,6 +2011,9 @@ function handlePageTabClick(event) {
 function setCurrentView(view) {
   if (!["home", "ledger", "settings"].includes(view)) {
     return;
+  }
+  if (view !== "settings") {
+    state.onboardingSettingsOnly = false;
   }
   state.currentView = view;
   setAllFriendMenus(false);
@@ -810,6 +2035,8 @@ function setCurrentView(view) {
 function applyCurrentView() {
   const isHome = state.currentView === "home";
   const isLedger = state.currentView === "ledger";
+  const isSettings = state.currentView === "settings";
+  const isOnboardingSettingsOnly = isSettings && state.onboardingSettingsOnly;
   document.body.classList.toggle("view-home-mode", isHome);
   for (const section of homeSections) {
     section.hidden = !isHome;
@@ -818,7 +2045,21 @@ function applyCurrentView() {
     section.hidden = !isLedger;
   }
   for (const section of settingsSections) {
-    section.hidden = state.currentView !== "settings";
+    if (!isSettings) {
+      section.hidden = true;
+      continue;
+    }
+    if (!isOnboardingSettingsOnly) {
+      section.hidden = false;
+      continue;
+    }
+    section.hidden = section.id !== "settings-account-manager-card";
+  }
+  if (onboardingAccountManagerNoteEl) {
+    onboardingAccountManagerNoteEl.hidden = !isOnboardingSettingsOnly;
+  }
+  if (onboardingAccountManagerActionsEl) {
+    onboardingAccountManagerActionsEl.hidden = !isOnboardingSettingsOnly;
   }
 
   if (pageTabs) {
@@ -1124,8 +2365,28 @@ function handlePreview() {
 }
 
 function getQuickTypePreset() {
-  const value = String(quickKindSelect?.value || "auto");
-  return QUICK_KIND_PRESETS[value] || QUICK_KIND_PRESETS.auto;
+  const value = normalizeQuickKindValue(String(quickKindSelect?.value || "auto"));
+  if (value === "auto") {
+    return { kind: null, account: null, ledger: null };
+  }
+  const match = value.match(/^([^:]+):(income|expense|cash)$/);
+  if (!match) {
+    return { kind: null, account: null, ledger: null };
+  }
+  const [, ledgerId, action] = match;
+  const isFlower = ledgerId === "flower";
+  if (action === "cash") {
+    return {
+      kind: null,
+      account: isFlower ? "flowerCash" : "personalCash",
+      ledger: ledgerId,
+    };
+  }
+  return {
+    kind: action,
+    account: isFlower ? "flowerChecking" : "personalChecking",
+    ledger: ledgerId,
+  };
 }
 
 function buildQuickParseOptions() {
@@ -1195,8 +2456,8 @@ function handleQuickKindMenuClick(event) {
   if (!button || !quickKindSelect) {
     return;
   }
-  const value = String(button.dataset.quickKindOption || "");
-  if (!Object.prototype.hasOwnProperty.call(QUICK_KIND_PRESETS, value)) {
+  const value = normalizeQuickKindValue(String(button.dataset.quickKindOption || ""));
+  if (!getQuickKindValues().includes(value)) {
     return;
   }
   quickKindSelect.value = value;
@@ -1216,8 +2477,11 @@ function renderQuickKindPicker() {
   if (!quickKindSelect || !quickKindLabelEl || !quickKindMenuEl) {
     return;
   }
-  const value = String(quickKindSelect.value || "auto");
-  quickKindLabelEl.textContent = QUICK_KIND_LABEL[value] || QUICK_KIND_LABEL.auto;
+  const allowedValues = getQuickKindValues();
+  const normalizedValue = normalizeQuickKindValue(String(quickKindSelect.value || "auto"));
+  const value = allowedValues.includes(normalizedValue) ? normalizedValue : "auto";
+  quickKindSelect.value = value;
+  quickKindLabelEl.textContent = getQuickKindLabel(value);
   const options = quickKindMenuEl.querySelectorAll("button[data-quick-kind-option]");
   for (const option of options) {
     const active = option.dataset.quickKindOption === value;
@@ -1243,8 +2507,8 @@ function handleQuickAccountToggle(event) {
   if (!button || !quickKindSelect) {
     return;
   }
-  const value = String(button.dataset.quickKind || "");
-  if (!value || !Object.prototype.hasOwnProperty.call(QUICK_KIND_PRESETS, value)) {
+  const value = normalizeQuickKindValue(String(button.dataset.quickKind || ""));
+  if (!value || !getQuickKindValues().includes(value)) {
     return;
   }
   quickKindSelect.value = value;
@@ -1285,11 +2549,11 @@ function renderQuickAccountToggle() {
   }
   const preset = getQuickTypePreset();
   quickAccountEl.value = preset.account || "auto";
-  const selected = String(quickKindSelect.value || "auto");
-  const buttons = QUICK_KIND_ORDER.map(
+  const selected = normalizeQuickKindValue(String(quickKindSelect.value || "auto"));
+  const buttons = getQuickKindValues().map(
     (value) =>
       `<button type="button" class="account-toggle-btn ${value === selected ? "active" : ""}" data-quick-kind="${value}">${escapeHtml(
-        QUICK_KIND_LABEL[value] || value
+        getQuickKindLabel(value)
       )}</button>`
   );
   quickAccountToggleEl.innerHTML = buttons.join("");
@@ -1307,9 +2571,10 @@ function renderQuickCardOptions() {
   if (!quickCardEl) {
     return;
   }
-  const cards = getManagedItems("cardDebts");
+  const ledgerId = getPreferredQuickCardLedgerId();
+  const cards = getManagedCardsForLedger(ledgerId);
   const previous = String(quickCardEl.value || "auto");
-  const defaultCardId = getDefaultQuickCardId(cards);
+  const defaultCardId = getDefaultQuickCardId(cards, ledgerId);
   const options = ['<option value="auto">카드 미선택</option>'];
   for (const card of cards) {
     options.push(
@@ -1332,7 +2597,8 @@ function syncQuickCardState() {
     return;
   }
   const preset = getQuickTypePreset();
-  const disabled = preset.ledger === "flower" || preset.account === "personalCash";
+  const forcedKind = getQuickForcedKind();
+  const disabled = forcedKind === "transfer" || String(preset.account || "").toLowerCase().includes("cash");
   quickCardEl.disabled = disabled;
   if (disabled) {
     quickCardEl.value = "auto";
@@ -1340,11 +2606,26 @@ function syncQuickCardState() {
   }
   const selected = String(quickCardEl.value || "auto");
   if (selected === "auto") {
-    const defaultCardId = getDefaultQuickCardId();
+    const defaultCardId = getDefaultQuickCardId(getManagedCardsForLedger(getPreferredQuickCardLedgerId()), getPreferredQuickCardLedgerId());
     if (defaultCardId) {
       quickCardEl.value = defaultCardId;
     }
   }
+}
+
+function getPreferredQuickCardLedgerId() {
+  const forcedLedger = getQuickForcedLedger();
+  if (forcedLedger) {
+    return forcedLedger;
+  }
+  const account = String(quickAccountEl?.value || "");
+  if (FLOWER_ACCOUNTS.includes(account)) {
+    return "flower";
+  }
+  if (PERSONAL_ACCOUNTS.includes(account)) {
+    return "personal";
+  }
+  return "personal";
 }
 
 function renderQuickCategoryToggle() {
@@ -1791,8 +3072,9 @@ function handleRecordsManagerAction(event) {
   const nameInput = row.querySelector("input[data-managed-name]");
   const amountInput = row.querySelector("input[data-managed-amount]");
   const name = nameInput.value.trim();
-  const amount = normalizeManagedAmount(config.type, amountInput.value, { allowZero: config.type === "cardDebts" });
-  if (!name || amount < 0 || (config.type !== "cardDebts" && amount <= 0)) {
+  const allowZero = isCardManagerType(config.type);
+  const amount = normalizeManagedAmount(config.type, amountInput.value, { allowZero });
+  if (!name || amount < 0 || (!allowZero && amount <= 0)) {
     parserPreview.textContent = "수정 실패: 이름/금액을 확인해주세요.";
     return;
   }
@@ -1873,8 +3155,9 @@ function handleAccountsManagerAction(event) {
   const nameInput = row.querySelector("input[data-managed-name]");
   const amountInput = row.querySelector("input[data-managed-amount]");
   const name = String(nameInput?.value || "").trim();
-  const amount = normalizeManagedAmount(type, String(amountInput?.value || ""), { allowZero: type === "cardDebts" });
-  if (!name || amount < 0 || (type !== "cardDebts" && amount <= 0)) {
+  const allowZero = isCardManagerType(type);
+  const amount = normalizeManagedAmount(type, String(amountInput?.value || ""), { allowZero });
+  if (!name || amount < 0 || (!allowZero && amount <= 0)) {
     parserPreview.textContent = "수정 실패: 이름/금액을 확인해주세요.";
     return;
   }
@@ -2245,6 +3528,16 @@ function populateSyncForm() {
   syncTokenEl.value = syncRuntime.config.token || "";
   syncIntervalEl.value = String(syncRuntime.config.intervalSec || DEFAULT_SYNC_CONFIG.intervalSec);
   syncEnabledEl.checked = Boolean(syncRuntime.config.enabled);
+  if (SYNC_AUTO_MANAGED) {
+    syncEndpointEl.readOnly = true;
+    syncTokenEl.readOnly = true;
+    syncEnabledEl.disabled = true;
+    const submitButton = syncFormEl.querySelector('button[type="submit"]');
+    if (submitButton) {
+      submitButton.textContent = "자동 설정됨";
+      submitButton.disabled = true;
+    }
+  }
 }
 
 function renderSyncStatus() {
@@ -2260,7 +3553,7 @@ function renderSyncStatus() {
     return;
   }
   if (!config.endpoint) {
-    syncStatusEl.textContent = "Sync URL을 입력하면 자동 연동이 시작돼요.";
+    syncStatusEl.textContent = "연동 주소를 확인해주세요.";
     return;
   }
   if (meta.lastError) {
@@ -2298,6 +3591,11 @@ function formatSyncDateTime(timestamp) {
 
 function handleSyncFormSubmit(event) {
   event.preventDefault();
+  if (SYNC_AUTO_MANAGED) {
+    parserPreview.textContent = "자동 연동은 이미 앱에 고정되어 있어요.";
+    renderSyncStatus();
+    return;
+  }
   if (!syncEndpointEl || !syncTokenEl || !syncIntervalEl || !syncEnabledEl) {
     return;
   }
@@ -2450,6 +3748,9 @@ function normalizeRemoteEnvelope(input) {
 
 async function fetchRemoteEnvelope() {
   const endpoint = syncRuntime.config.endpoint;
+  if (isSupabaseEndpoint(endpoint)) {
+    return fetchRemoteEnvelopeFromSupabase();
+  }
   const gistId = getGitHubGistId(endpoint);
   if (gistId) {
     return fetchRemoteEnvelopeFromGitHubGist(gistId);
@@ -2471,6 +3772,10 @@ async function fetchRemoteEnvelope() {
 
 async function pushRemoteEnvelope(envelope) {
   const endpoint = syncRuntime.config.endpoint;
+  if (isSupabaseEndpoint(endpoint)) {
+    await pushRemoteEnvelopeToSupabase(envelope);
+    return;
+  }
   const gistId = getGitHubGistId(endpoint);
   if (gistId) {
     await pushRemoteEnvelopeToGitHubGist(gistId, envelope);
@@ -2523,6 +3828,93 @@ function getGitHubGistId(endpoint) {
   const normalized = String(endpoint || "").trim();
   const match = normalized.match(/^https?:\/\/api\.github\.com\/gists\/([0-9a-f]+)(?:[/?#].*)?$/i);
   return match ? match[1] : null;
+}
+
+function isSupabaseEndpoint(endpoint) {
+  const normalized = String(endpoint || "").trim();
+  return /supabase\.co/i.test(normalized);
+}
+
+function getSupabaseBaseUrl(endpoint) {
+  const normalized = String(endpoint || "").trim();
+  if (!normalized) {
+    return "";
+  }
+  try {
+    const parsed = new URL(normalized);
+    return parsed.origin;
+  } catch {
+    return normalized.replace(/\/+$/, "");
+  }
+}
+
+function buildSupabaseHeaders(options = {}) {
+  const publishableKey = String(syncRuntime.config.token || "").trim();
+  if (!publishableKey) {
+    throw new Error("Supabase Publishable key를 Access Token 칸에 입력해주세요.");
+  }
+  const headers = {
+    apikey: publishableKey,
+    Authorization: `Bearer ${publishableKey}`,
+    Accept: "application/json",
+  };
+  if (options.json) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (options.prefer) {
+    headers.Prefer = options.prefer;
+  }
+  return headers;
+}
+
+async function fetchRemoteEnvelopeFromSupabase() {
+  const baseUrl = getSupabaseBaseUrl(syncRuntime.config.endpoint);
+  if (!baseUrl) {
+    return null;
+  }
+  const endpoint = `${baseUrl}/rest/v1/${SUPABASE_SYNC_TABLE}?id=eq.${encodeURIComponent(
+    SUPABASE_SYNC_ROW_ID
+  )}&select=payload`;
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers: buildSupabaseHeaders(),
+    cache: "no-store",
+  });
+  if (response.status === 404 || response.status === 204) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(`Supabase 읽기 실패 (${response.status})`);
+  }
+  const rows = await response.json();
+  if (!Array.isArray(rows) || !rows.length || !rows[0] || typeof rows[0] !== "object") {
+    return null;
+  }
+  return normalizeRemoteEnvelope(rows[0].payload);
+}
+
+async function pushRemoteEnvelopeToSupabase(envelope) {
+  const baseUrl = getSupabaseBaseUrl(syncRuntime.config.endpoint);
+  if (!baseUrl) {
+    throw new Error("Supabase URL을 확인해주세요.");
+  }
+  const endpoint = `${baseUrl}/rest/v1/${SUPABASE_SYNC_TABLE}?on_conflict=id`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: buildSupabaseHeaders({
+      json: true,
+      prefer: "resolution=merge-duplicates,return=minimal",
+    }),
+    body: JSON.stringify([
+      {
+        id: SUPABASE_SYNC_ROW_ID,
+        payload: envelope,
+      },
+    ]),
+  });
+  if (!response.ok) {
+    throw new Error(`Supabase 저장 실패 (${response.status})`);
+  }
 }
 
 async function fetchRemoteEnvelopeFromGitHubGist(gistId) {
@@ -2605,9 +3997,11 @@ async function pushRemoteEnvelopeToGitHubGist(gistId, envelope) {
 }
 
 function applyRemoteEnvelope(remoteEnvelope) {
-  const nextTransactions = Array.isArray(remoteEnvelope?.data?.transactions)
+  const remoteTransactions = Array.isArray(remoteEnvelope?.data?.transactions)
     ? remoteEnvelope.data.transactions.map(normalizeTransaction).filter(Boolean)
     : [];
+  const nextTransactions = mergeTransactionsForSync(state.transactions, remoteTransactions);
+  const addedFromLocal = Math.max(0, nextTransactions.length - remoteTransactions.length);
   const nextSettings = normalizeSettings(remoteEnvelope?.data?.settings);
   const nextFriendsHidden = Boolean(remoteEnvelope?.data?.friendsHidden);
 
@@ -2623,7 +4017,9 @@ function applyRemoteEnvelope(remoteEnvelope) {
     suppressLocalSyncMark = false;
   }
 
-  syncRuntime.meta.lastLocalUpdatedAt = Number(remoteEnvelope.updatedAt || Date.now());
+  // If remote data looked older/incomplete, keep local transactions and re-push merged copy.
+  syncRuntime.meta.lastLocalUpdatedAt =
+    addedFromLocal > 0 ? Date.now() : Number(remoteEnvelope.updatedAt || Date.now());
   saveSyncMeta();
   syncSetupForm();
   applyFriendLayerVisibility();
@@ -2638,13 +4034,35 @@ function applyRemoteEnvelope(remoteEnvelope) {
   render();
 }
 
+function mergeTransactionsForSync(localTransactions, remoteTransactions) {
+  const map = new Map();
+
+  for (const tx of remoteTransactions || []) {
+    if (tx && tx.id) {
+      map.set(String(tx.id), tx);
+    }
+  }
+  for (const tx of localTransactions || []) {
+    if (tx && tx.id && !map.has(String(tx.id))) {
+      map.set(String(tx.id), tx);
+    }
+  }
+
+  const merged = Array.from(map.values());
+  merged.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return merged;
+}
+
 function getSyncErrorMessage(error) {
   if (!error) {
     return "알 수 없는 오류";
   }
   const raw = String(error.message || error);
   if (/\(401\)|\(403\)/.test(raw)) {
-    return "토큰 권한을 확인해주세요 (GitHub는 gist 권한 필요).";
+    return "키 권한을 확인해주세요.";
+  }
+  if (/\(404\)/.test(raw) && /Supabase/.test(raw)) {
+    return "Supabase 테이블이 아직 없어요. SQL Editor에서 테이블을 먼저 만들어주세요.";
   }
   if (/failed to fetch|networkerror|load failed/i.test(raw)) {
     return "네트워크 또는 CORS 설정을 확인해주세요.";
@@ -2653,6 +4071,10 @@ function getSyncErrorMessage(error) {
 }
 
 function render() {
+  applyDynamicLabels();
+  const profile = getUserProfile();
+  const combinedScopeActive = isCombinedScope(state.selectedScope);
+  const activeCombinedConfig = combinedScopeActive ? getCombinedConfigByScope(state.selectedScope) : null;
   const monthlyTransactions = getCurrentMonthTransactions(state.transactions);
   const personalMonthlyTransactions = monthlyTransactions.filter((transaction) => transaction.ledger === "personal");
   const flowerMonthlyTransactions = monthlyTransactions.filter((transaction) => transaction.ledger === "flower");
@@ -2674,13 +4096,35 @@ function render() {
   const flowerIncomeTransactions = flowerCheckingMonthly.filter((transaction) => transaction.kind === "income");
   const flowerOutflow = sumAmounts(flowerExpenseTransactions);
   const flowerInflow = sumAmounts(flowerIncomeTransactions);
+  const combinedMonthlyTransactions = combinedScopeActive
+    ? getScopeTransactions(monthlyTransactions, state.selectedScope)
+    : [];
+  const combinedCheckingMonthly = combinedMonthlyTransactions.filter(
+    (transaction) =>
+      transaction.kind !== "transfer" && transaction.account === getPrimaryCheckingAccountForLedger(transaction.ledger)
+  );
+  const combinedExpenseTransactions = combinedCheckingMonthly.filter((transaction) => transaction.kind === "expense");
+  const combinedIncomeTransactions = combinedCheckingMonthly.filter((transaction) => transaction.kind === "income");
+  const combinedOutflowTotal = sumAmounts(combinedExpenseTransactions);
+  const combinedInflowTotal = sumAmounts(combinedIncomeTransactions);
+  const combinedNet = combinedInflowTotal - combinedOutflowTotal;
+  const selectedCheckingAccount = getPrimaryCheckingAccountForLedger(state.selectedScope);
+  const selectedLedgerMonthly = monthlyTransactions.filter((transaction) => transaction.ledger === state.selectedScope);
+  const selectedCheckingMonthly = selectedLedgerMonthly.filter(
+    (transaction) => transaction.kind !== "transfer" && transaction.account === selectedCheckingAccount
+  );
+  const selectedExpenseTransactions = selectedCheckingMonthly.filter((transaction) => transaction.kind === "expense");
+  const selectedIncomeTransactions = selectedCheckingMonthly.filter((transaction) => transaction.kind === "income");
+  const selectedOutflowTotal = sumAmounts(selectedExpenseTransactions);
+  const selectedInflowTotal = sumAmounts(selectedIncomeTransactions);
+  const selectedNet = selectedInflowTotal - selectedOutflowTotal;
 
   const scopeBaseForCharts =
-    state.selectedScope === "flower"
-      ? flowerCheckingMonthly
-      : state.selectedScope === "personal"
-        ? personalCheckingMonthly
-        : [];
+    state.selectedScope === "accounts"
+      ? []
+      : combinedScopeActive
+        ? combinedCheckingMonthly
+        : selectedCheckingMonthly;
   const scopeExpenseTransactions = scopeBaseForCharts.filter((transaction) => transaction.kind === "expense");
   const categoryEntries = getCategoryEntries(scopeExpenseTransactions);
   if (state.selectedCategory && !categoryEntries.some(([category]) => category === state.selectedCategory)) {
@@ -2698,13 +4142,43 @@ function render() {
   applyStatCardColors();
   renderScopeCards();
 
-  monthlyOutflowEl.textContent = formatMoney(personalOutflowTotal);
-  monthlyInflowEl.textContent = formatMoney(personalInflowTotal);
-  monthlyNetEl.textContent = formatSignedMoney(personalNet);
+  const currentScopeName =
+    combinedScopeActive
+      ? activeCombinedConfig?.name || profile.combinedLedgerName
+      : getLedgerNameById(state.selectedScope);
+  const monthlyOutflowLabelEl = document.querySelector('.stat-card[data-card="monthly-outflow"] .label');
+  const monthlyInflowLabelEl = document.querySelector('.stat-card[data-card="monthly-inflow"] .label');
+  const monthlyNetLabelEl = document.querySelector('.stat-card[data-card="monthly-net"] .label');
+  if (monthlyOutflowLabelEl) monthlyOutflowLabelEl.textContent = `${currentScopeName} 이번 달 지출`;
+  if (monthlyInflowLabelEl) monthlyInflowLabelEl.textContent = `${currentScopeName} 이번 달 입금`;
+  if (monthlyNetLabelEl) monthlyNetLabelEl.textContent = `${currentScopeName} 이번 달 잔액 변화`;
+
+  const displayOutflow =
+    combinedScopeActive
+      ? combinedOutflowTotal
+      : state.selectedScope === "accounts"
+        ? personalOutflowTotal
+        : selectedOutflowTotal;
+  const displayInflow =
+    combinedScopeActive
+      ? combinedInflowTotal
+      : state.selectedScope === "accounts"
+        ? personalInflowTotal
+        : selectedInflowTotal;
+  const displayNet =
+    combinedScopeActive
+      ? combinedNet
+      : state.selectedScope === "accounts"
+        ? personalNet
+        : selectedNet;
+
+  monthlyOutflowEl.textContent = formatMoney(displayOutflow);
+  monthlyInflowEl.textContent = formatMoney(displayInflow);
+  monthlyNetEl.textContent = formatSignedMoney(displayNet);
   flowerMonthlyOutflowEl.textContent = formatMoney(flowerOutflow);
   flowerMonthlyInflowEl.textContent = formatMoney(flowerInflow);
-  monthlyNetEl.classList.toggle("is-positive", personalNet > 0);
-  monthlyNetEl.classList.toggle("is-negative", personalNet < 0);
+  monthlyNetEl.classList.toggle("is-positive", displayNet > 0);
+  monthlyNetEl.classList.toggle("is-negative", displayNet < 0);
   monthlyNetEl.style.color = getContrastText(getCardColor("monthly-net"));
 
   setBalanceText(balanceCheckingEl, -getCardDueAmount(), "balance-checking");
@@ -2730,13 +4204,15 @@ function render() {
   renderQuickCategoryToggle();
   renderCategoryColorSettings();
   renderFriendShortcutSettings();
+  syncProfileForm();
   if (state.currentDetailCard) {
     renderRecordsPage();
   }
 }
 
 function renderScopeCards() {
-  const allowed = new Set(SCOPE_CARD_MAP[state.selectedScope] || SCOPE_CARD_MAP.personal);
+  const scopeKey = isCombinedScope(state.selectedScope) ? "combined" : state.selectedScope;
+  const allowed = new Set(SCOPE_CARD_MAP[scopeKey] || SCOPE_CARD_MAP.personal);
   const cards = document.querySelectorAll(".stat-card[data-card]");
   for (const card of cards) {
     card.classList.toggle("scope-hidden", !allowed.has(card.dataset.card));
@@ -2768,68 +4244,72 @@ function renderAccountsBreakdown(balances) {
     accountsBreakdownGridEl.innerHTML = "";
     return;
   }
+  void balances;
 
-  const creditItems = getManagedItems("cardDebts")
-    .map((item) => ({ name: item.name, amount: roundMoney(item.amount) }))
-    .filter((item) => item.amount > 0);
+  const ledgers = getLedgerDefinitions();
+  const panels = [];
 
-  const savingsManaged = getManagedItems("personalSavings")
-    .map((item) => ({ name: item.name, amount: roundMoney(item.amount) }))
-    .filter((item) => item.amount > 0);
+  for (let index = 0; index < ledgers.length; index += 1) {
+    const ledger = ledgers[index];
+    const cardItems = getManagedItems(`accountCards:${ledger.id}`)
+      .map((item) => ({ name: item.name, amount: roundMoney(item.amount) }))
+      .filter((item) => item.amount > 0);
+    const bankItems = getManagedItems(`accountBanks:${ledger.id}`)
+      .map((item) => ({ name: item.name, amount: roundMoney(item.amount) }))
+      .filter((item) => item.amount > 0);
 
-  const savingsItems =
-    savingsManaged.length > 0
-      ? savingsManaged
-      : [{ name: "개인 세이브통장", amount: Math.max(0, roundMoney(balances.personalSavings || 0)) }];
+    if (cardItems.length) {
+      panels.push(
+        renderBreakdownList({
+          title: `${ledger.name} 카드`,
+          empty: `등록된 ${ledger.name} 카드가 없어요.`,
+          items: cardItems,
+          total: cardItems.reduce((sum, item) => sum + item.amount, 0),
+          color: PALETTE[index % PALETTE.length] || "#FC5F1F",
+          negativePrefix: true,
+        })
+      );
+    }
 
-  const creditTotal = creditItems.reduce((sum, item) => sum + item.amount, 0);
-  const savingsTotal = savingsItems.reduce((sum, item) => sum + item.amount, 0);
-  const cashAmount = roundMoney(balances.personalCash || 0);
+    if (bankItems.length) {
+      panels.push(
+        renderBreakdownList({
+          title: `${ledger.name} 통장`,
+          empty: `등록된 ${ledger.name} 통장이 없어요.`,
+          items: bankItems,
+          total: bankItems.reduce((sum, item) => sum + item.amount, 0),
+          color: PALETTE[(index + 3) % PALETTE.length] || "#346D4A",
+          negativePrefix: false,
+        })
+      );
+    }
+  }
 
-  accountsBreakdownGridEl.innerHTML = `
-    ${renderBreakdownList({
-      title: "Credit Card 리스트",
-      empty: "등록된 크레딧 카드가 없어요.",
-      items: creditItems,
-      total: creditTotal,
-      color: "#FC5F1F",
-      negativePrefix: true,
-    })}
-    ${renderBreakdownList({
-      title: "세이브 통장 리스트",
-      empty: "등록된 세이브 통장이 없어요.",
-      items: savingsItems,
-      total: savingsTotal,
-      color: "#346D4A",
-      negativePrefix: false,
-    })}
-    <article class="accounts-breakdown-panel cash">
-      <div class="section-title-row">
-        <h3>개인 현금</h3>
-      </div>
-      <div class="accounts-cash-pill">
-        <span>현재 보유 현금</span>
-        <strong>${formatSignedMoney(cashAmount)}</strong>
-      </div>
-    </article>
-  `;
+  if (!panels.length) {
+    accountsBreakdownGridEl.innerHTML = '<article class="accounts-breakdown-panel"><p class="empty">설정 탭에서 계정별 통장/카드를 먼저 추가해주세요.</p></article>';
+    return;
+  }
+
+  accountsBreakdownGridEl.innerHTML = panels.join("");
 }
 
-function renderAccountsManagers() {
-  if (!accountsManageGridEl) {
+function renderAccountsManagerGrid(container, options = {}) {
+  if (!container) {
     return;
   }
-  if (state.selectedScope !== "accounts") {
-    accountsManageGridEl.innerHTML = "";
+  const { onlyWhenAccountsScope = false } = options;
+  if (onlyWhenAccountsScope && state.selectedScope !== "accounts") {
+    container.innerHTML = "";
     return;
   }
-
-  accountsManageGridEl.innerHTML = ACCOUNTS_MANAGER_CONFIG.map((config) => {
+  const configs = getAccountManagerConfigs();
+  container.innerHTML = configs.map((config) => {
     const items = getManagedItems(config.type);
+    const isCardType = isCardManagerType(config.type);
     const rows = items.length
       ? items
           .map((item) => {
-            const amountValue = config.type === "cardDebts" ? (item.amount ? -item.amount : 0) : item.amount;
+            const amountValue = isCardType ? (item.amount ? -item.amount : 0) : item.amount;
             return `
               <li class="accounts-manager-item" data-managed-id="${item.id}" data-manage-type="${config.type}">
                 <input class="manage-name-input" type="text" data-managed-name value="${escapeHtml(item.name)}" />
@@ -2856,6 +4336,11 @@ function renderAccountsManagers() {
       </article>
     `;
   }).join("");
+}
+
+function renderAccountsManagers() {
+  renderAccountsManagerGrid(accountsManageGridEl, { onlyWhenAccountsScope: true });
+  renderAccountsManagerGrid(settingsAccountsManageGridEl, { onlyWhenAccountsScope: false });
 }
 
 function renderBreakdownList(config) {
@@ -3466,6 +4951,14 @@ function getDefaultCardTransferTarget() {
 }
 
 function getCardDetailView(cardKey) {
+  const profile = getUserProfile();
+  const personalLabel = profile.personalLedgerName;
+  const flowerLabel = profile.flowerLedgerName;
+  const combinedScopeActive = isCombinedScope(state.selectedScope);
+  const activeCombinedConfig = combinedScopeActive ? getCombinedConfigByScope(state.selectedScope) : null;
+  const combinedLabel = activeCombinedConfig?.name || profile.combinedLedgerName;
+  const isAccountsScope = state.selectedScope === "accounts";
+  const selectedScopeLabel = combinedScopeActive ? combinedLabel : getLedgerNameById(state.selectedScope);
   const allTransactions = [...state.transactions];
   const personalAll = allTransactions.filter((transaction) => transaction.ledger === "personal");
   const flowerAll = allTransactions.filter((transaction) => transaction.ledger === "flower");
@@ -3475,22 +4968,38 @@ function getCardDetailView(cardKey) {
   const flowerCheckingAll = flowerAll.filter(
     (transaction) => transaction.kind !== "transfer" && transaction.account === "flowerChecking"
   );
+  const combinedAll = combinedScopeActive ? getScopeTransactions(allTransactions, state.selectedScope) : [];
+  const combinedCheckingAll = combinedAll.filter(
+    (transaction) =>
+      transaction.kind !== "transfer" && transaction.account === getPrimaryCheckingAccountForLedger(transaction.ledger)
+  );
+  const selectedCheckingAll =
+    combinedScopeActive || isAccountsScope
+      ? combinedScopeActive
+        ? combinedCheckingAll
+        : personalCheckingAll
+      : allTransactions.filter(
+          (transaction) =>
+            transaction.ledger === state.selectedScope &&
+            transaction.kind !== "transfer" &&
+            transaction.account === getPrimaryCheckingAccountForLedger(state.selectedScope)
+        );
 
   const cases = {
     "monthly-outflow": {
-      title: "개인 지출 내역",
-      subtitle: "개인 소비통장 기준",
-      allTransactions: personalCheckingAll.filter((transaction) => transaction.kind === "expense"),
+      title: `${selectedScopeLabel} 지출 내역`,
+      subtitle: `${selectedScopeLabel} 소비통장 기준`,
+      allTransactions: selectedCheckingAll.filter((transaction) => transaction.kind === "expense"),
     },
     "monthly-inflow": {
-      title: "개인 입금 내역",
-      subtitle: "개인 소비통장 기준",
-      allTransactions: personalCheckingAll.filter((transaction) => transaction.kind === "income"),
+      title: `${selectedScopeLabel} 입금 내역`,
+      subtitle: `${selectedScopeLabel} 소비통장 기준`,
+      allTransactions: selectedCheckingAll.filter((transaction) => transaction.kind === "income"),
     },
     "monthly-net": {
-      title: "개인 잔액 변화 내역",
-      subtitle: "개인 소비통장 기준 · 입금/지출",
-      allTransactions: personalCheckingAll,
+      title: `${selectedScopeLabel} 잔액 변화 내역`,
+      subtitle: `${selectedScopeLabel} 소비통장 기준 · 입금/지출`,
+      allTransactions: selectedCheckingAll,
     },
     "balance-checking": {
       title: "Credit Card 내역",
@@ -3498,33 +5007,33 @@ function getCardDetailView(cardKey) {
       allTransactions: getCardLinkedTransactions(personalAll),
     },
     "balance-savings": {
-      title: "개인 세이브통장 내역",
-      subtitle: "개인장부와 동기화",
+      title: `${personalLabel} 세이브통장 내역`,
+      subtitle: `${personalLabel} 장부와 동기화`,
       allTransactions: getAccountTransactions(personalAll, "personalSavings"),
     },
     "balance-cash": {
-      title: "개인 현금 내역",
-      subtitle: "개인장부와 동기화",
+      title: `${personalLabel} 현금 내역`,
+      subtitle: `${personalLabel} 장부와 동기화`,
       allTransactions: getAccountTransactions(personalAll, "personalCash"),
     },
     "balance-flower": {
-      title: "꽃 소비통장 내역",
-      subtitle: "꽃장부와 동기화",
+      title: `${flowerLabel} 소비통장 내역`,
+      subtitle: `${flowerLabel} 장부와 동기화`,
       allTransactions: getAccountTransactions(flowerAll, "flowerChecking"),
     },
     "balance-flower-cash": {
-      title: "꽃 현금 내역",
-      subtitle: "꽃장부와 동기화",
+      title: `${flowerLabel} 현금 내역`,
+      subtitle: `${flowerLabel} 장부와 동기화`,
       allTransactions: getAccountTransactions(flowerAll, "flowerCash"),
     },
     "flower-monthly-outflow": {
-      title: "꽃 지출 내역",
-      subtitle: "꽃 소비통장 기준",
+      title: `${flowerLabel} 지출 내역`,
+      subtitle: `${flowerLabel} 소비통장 기준`,
       allTransactions: flowerCheckingAll.filter((transaction) => transaction.kind === "expense"),
     },
     "flower-monthly-inflow": {
-      title: "꽃 입금 내역",
-      subtitle: "꽃 소비통장 기준",
+      title: `${flowerLabel} 입금 내역`,
+      subtitle: `${flowerLabel} 소비통장 기준`,
       allTransactions: flowerCheckingAll.filter((transaction) => transaction.kind === "income"),
     },
     "card-due": {
@@ -3693,10 +5202,7 @@ function renderEditLedgerToggle(disabled = false) {
   if (!editLedgerToggleEl || !editLedgerEl) {
     return;
   }
-  const options = [
-    { value: "personal", label: "개인" },
-    { value: "flower", label: "Blessom Flower" },
-  ];
+  const options = getLedgerDefinitions().map((ledger) => ({ value: ledger.id, label: ledger.name }));
   const selected = editLedgerEl.value;
   editLedgerToggleEl.innerHTML = options
     .map(
@@ -3727,7 +5233,8 @@ function handleEditLedgerToggle(event) {
     return;
   }
   const value = String(button.dataset.editLedger || "");
-  if (!["personal", "flower"].includes(value)) {
+  const validLedgers = new Set(getLedgerDefinitions().map((ledger) => ledger.id));
+  if (!validLedgers.has(value)) {
     return;
   }
   editLedgerEl.value = value;
@@ -3861,9 +5368,10 @@ function populateEditCardOptions(ledger, account) {
     return;
   }
   const previous = String(editCardEl.value || "auto");
-  const disabled = ledger !== "personal" || account === "personalCash";
+  const disabled = String(account || "").toLowerCase().includes("cash");
+  const cards = getManagedCardsForLedger(ledger);
   const options = ['<option value="auto">카드 미선택</option>'];
-  for (const card of getManagedItems("cardDebts")) {
+  for (const card of cards) {
     options.push(
       `<option value="${escapeHtml(card.id)}">${escapeHtml(card.name)} (${formatMoney(card.amount)})</option>`
     );
@@ -3874,7 +5382,7 @@ function populateEditCardOptions(ledger, account) {
     editCardEl.value = "auto";
     return;
   }
-  editCardEl.value = getCardNameById(previous) ? previous : "auto";
+  editCardEl.value = cards.some((card) => card.id === previous) ? previous : "auto";
 }
 
 function renderEditAccountToggle(options) {
@@ -4010,7 +5518,8 @@ function getEditCategoryCandidates({ kind, ledger }) {
     "Other",
   ];
   const basePersonalIncome = ["Income", "Reward", "Refund", "Salary", "Bonus", "Other"];
-  const baseFlower = ["Blessom Flower", "Flower Income", "Flower Expense", "Wedding", "Material", "Other"];
+  const flowerName = getUserProfile().flowerLedgerName;
+  const baseFlower = [flowerName, "Flower Income", "Flower Expense", "Wedding", "Material", "Other"];
 
   const base =
     ledger === "flower" ? baseFlower : kind === "income" ? basePersonalIncome : basePersonalExpense;
@@ -4155,15 +5664,17 @@ function dateInputToIso(inputValue) {
 }
 
 function renderKeywordSettings() {
-  if (state.settings.flowerKeywords.length) {
-    flowerKeywordListEl.innerHTML = state.settings.flowerKeywords
-      .map(
-        (keyword) =>
-          `<span class="keyword-chip">${escapeHtml(keyword)}<button type="button" data-remove-flower="${encodeURIComponent(keyword)}">삭제</button></span>`
-      )
-      .join("");
-  } else {
-    flowerKeywordListEl.innerHTML = '<p class="empty">등록된 꽃사업 키워드가 없어요.</p>';
+  if (flowerKeywordListEl) {
+    if (state.settings.flowerKeywords.length) {
+      flowerKeywordListEl.innerHTML = state.settings.flowerKeywords
+        .map(
+          (keyword) =>
+            `<span class="keyword-chip">${escapeHtml(keyword)}<button type="button" data-remove-flower="${encodeURIComponent(keyword)}">삭제</button></span>`
+        )
+        .join("");
+    } else {
+      flowerKeywordListEl.innerHTML = '<p class="empty">등록된 꽃사업 키워드가 없어요.</p>';
+    }
   }
 
   renderCategoryManageSettings();
@@ -4202,11 +5713,13 @@ function renderKeywordSettings() {
 function getConfiguredCategories() {
   const fromSettings = Array.isArray(state.settings.categories) ? state.settings.categories : [];
   const base = fromSettings.length ? fromSettings : DEFAULT_CATEGORY_LIST;
+  const profileFlowerCategory = getUserProfile().flowerLedgerName;
   const fromTransactions = state.transactions
     .filter((transaction) => transaction.kind !== "transfer")
     .map((transaction) => String(transaction.category || "").trim())
     .filter((category) => Boolean(category));
   const combined = normalizeCategoryList([
+    profileFlowerCategory,
     ...base,
     ...fromTransactions,
   ]);
@@ -4740,7 +6253,10 @@ function parseQuickEntry(rawInput, options = {}) {
 
   const forceLedger = matchedRule && matchedRule.ledger !== "auto" ? matchedRule.ledger : null;
   const forceKind = matchedRule && matchedRule.kind !== "auto" ? matchedRule.kind : null;
-  const forcedLedger = ["personal", "flower"].includes(options.forcedLedger) ? options.forcedLedger : null;
+  const forcedLedger =
+    typeof options.forcedLedger === "string" && String(options.forcedLedger).trim()
+      ? String(options.forcedLedger).trim()
+      : null;
   const forcedAccount = NON_TRANSFER_ACCOUNTS.includes(options.forcedAccount) ? options.forcedAccount : null;
   const forcedCardId = getCardNameById(options.forcedCardId) ? String(options.forcedCardId) : null;
   const forcedCategory = getConfiguredCategories().includes(options.forcedCategory) ? options.forcedCategory : null;
@@ -4778,8 +6294,8 @@ function parseQuickEntry(rawInput, options = {}) {
     }
 
     if (ledger === "flower") {
-      merchant = merchant || "Blessom Flower";
-      category = category || "Blessom Flower";
+      merchant = merchant || getUserProfile().flowerLedgerName;
+      category = category || "Other";
     } else {
       merchant = merchant || (defaultMatch ? defaultMatch.merchant : inferMerchant(dateData.text, amountData ? amountData.token : ""));
       category = category || (defaultMatch ? defaultMatch.category : inferCategory(normalized, merchant));
@@ -4812,6 +6328,9 @@ function parseQuickEntry(rawInput, options = {}) {
     merchant = kind === "transfer" ? "통장 이체" : "Quick Entry";
   }
   if (!category) {
+    category = "Other";
+  }
+  if (isBlockedCategoryName(category)) {
     category = "Other";
   }
 
@@ -5049,13 +6568,24 @@ function getCurrentMonthTransactions(transactions) {
 }
 
 function getScopeTransactions(transactions, scope) {
-  if (scope === "flower") {
-    return transactions.filter((transaction) => transaction.ledger === "flower");
+  if (isCombinedScope(scope)) {
+    const combinedConfig = getCombinedConfigByScope(scope);
+    const combinedMembers = Array.isArray(combinedConfig?.members) ? combinedConfig.members : [];
+    const memberLedgers = new Set(
+      getLedgerDefinitions()
+        .filter((ledger) => combinedMembers.includes(ledger.name))
+        .map((ledger) => ledger.id)
+    );
+    return transactions.filter((transaction) => memberLedgers.has(transaction.ledger));
   }
   if (scope === "accounts") {
     return transactions.filter((transaction) => transaction.ledger === "personal");
   }
-  return transactions.filter((transaction) => transaction.ledger === "personal");
+  return transactions.filter((transaction) => transaction.ledger === scope);
+}
+
+function getPrimaryCheckingAccountForLedger(ledgerId) {
+  return ledgerId === "flower" ? "flowerChecking" : "personalChecking";
 }
 
 function getCategoryEntries(expenseTransactions) {
@@ -5192,46 +6722,39 @@ function getCardIdFromTargetValue(value) {
   return id || null;
 }
 
+function getManagedCardsForLedger(ledgerId) {
+  const id = cleanText(ledgerId, "personal");
+  if (id === "personal") {
+    return getManagedItems("cardDebts");
+  }
+  return getManagedItems(`accountCards:${id}`);
+}
+
+function getAllManagedCardItems() {
+  const ledgers = getLedgerDefinitions();
+  const scopedKeys = Object.keys(state.settings.accountScopedManagers || {});
+  const ledgerIds = Array.from(new Set([...ledgers.map((ledger) => ledger.id), ...scopedKeys]));
+  const all = [];
+  for (const ledgerId of ledgerIds) {
+    const cards = getManagedCardsForLedger(ledgerId);
+    for (const card of cards) {
+      all.push(card);
+    }
+  }
+  return all;
+}
+
 function getCardNameById(cardId) {
   const id = String(cardId || "").trim();
   if (!id) {
     return "";
   }
-  const match = getManagedItems("cardDebts").find((item) => item.id === id);
+  const match = getAllManagedCardItems().find((item) => item.id === id);
   return match ? match.name : "";
 }
 
-function normalizeCardName(name) {
-  return String(name || "")
-    .toLowerCase()
-    .replace(/\s+/g, "");
-}
-
-function getDefaultQuickCardId(cards = getManagedItems("cardDebts")) {
-  const target = normalizeCardName(DEFAULT_QUICK_CARD_NAME);
-  const exact = cards.find((card) => normalizeCardName(card.name) === target);
-  if (exact) {
-    return exact.id;
-  }
-  const partial = cards.find((card) => normalizeCardName(card.name).includes("boavisa"));
-  if (partial) {
-    return partial.id;
-  }
+function getDefaultQuickCardId(cards = getManagedCardsForLedger("personal")) {
   return cards[0]?.id || null;
-}
-
-function ensureDefaultQuickCardItem() {
-  const cards = getManagedItems("cardDebts");
-  const target = normalizeCardName(DEFAULT_QUICK_CARD_NAME);
-  const exists = cards.some((card) => {
-    const normalized = normalizeCardName(card.name);
-    return normalized === target || normalized.includes("boavisa");
-  });
-  if (exists) {
-    return false;
-  }
-  setManagedItems("cardDebts", [{ id: createId(), name: DEFAULT_QUICK_CARD_NAME, amount: 0 }, ...cards]);
-  return true;
 }
 
 function getTransactionCardId(transaction) {
@@ -5309,12 +6832,20 @@ function normalizeGoalYears(value) {
   return numeric;
 }
 
+function normalizeCategoryKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isBlockedCategoryName(value) {
+  return BLOCKED_CATEGORY_NAMES.has(normalizeCategoryKey(value));
+}
+
 function normalizeCategoryList(values) {
   const list = Array.isArray(values) ? values : [];
   const normalized = uniqueOrdered(
     list
       .map((value) => String(value || "").trim())
-      .filter((value) => Boolean(value))
+      .filter((value) => Boolean(value) && !isBlockedCategoryName(value))
   );
   if (!normalized.includes("Other")) {
     normalized.push("Other");
@@ -5365,10 +6896,31 @@ function normalizeNamedAmountList(values, options = {}) {
 }
 
 function normalizeManagedAmount(type, value, options = {}) {
-  if (type === "cardDebts") {
+  if (isCardManagerType(type)) {
     return normalizeLiabilityAmount(value, options);
   }
   return normalizeAmount(value);
+}
+
+function normalizeAccountScopedManagers(input) {
+  const source = input && typeof input === "object" ? input : {};
+  const output = {};
+  for (const [ledgerIdRaw, payload] of Object.entries(source)) {
+    const ledgerId = String(ledgerIdRaw || "").trim();
+    if (!ledgerId || !payload || typeof payload !== "object") {
+      continue;
+    }
+    const cards = normalizeNamedAmountList(payload.cards, {
+      allowZero: true,
+      amountParser: normalizeLiabilityAmount,
+    });
+    const banks = normalizeNamedAmountList(payload.banks);
+    if (!cards.length && !banks.length) {
+      continue;
+    }
+    output[ledgerId] = { cards, banks };
+  }
+  return output;
 }
 
 function normalizeSavingGoals(values) {
@@ -5396,37 +6948,125 @@ function normalizeSavingGoals(values) {
 }
 
 function getManagedItems(type) {
-  if (type === "cardDebts") {
-    return normalizeNamedAmountList(state.settings.cardDebts, {
+  const parsed = parseManagedType(type);
+  if (parsed.kind === "cardDebts") {
+    return getManagedItems("accountCards:personal");
+  }
+  if (parsed.kind === "personalSavings") {
+    return getManagedItems("accountBanks:personal");
+  }
+  if (parsed.kind === "flowerChecking") {
+    return getManagedItems("accountBanks:flower");
+  }
+  if (parsed.kind === "accountCards") {
+    if (parsed.ledgerId === "personal") {
+      return normalizeNamedAmountList(state.settings.cardDebts, {
+        allowZero: true,
+        amountParser: normalizeLiabilityAmount,
+      });
+    }
+    const scoped = state.settings.accountScopedManagers?.[parsed.ledgerId]?.cards;
+    return normalizeNamedAmountList(scoped, {
       allowZero: true,
       amountParser: normalizeLiabilityAmount,
     });
   }
-  if (type === "personalChecking" || type === "personalSavings" || type === "flowerChecking") {
-    return normalizeNamedAmountList(state.settings.managedBalances?.[type]);
+  if (parsed.kind === "accountBanks") {
+    if (parsed.ledgerId === "personal") {
+      return normalizeNamedAmountList(state.settings.managedBalances?.personalSavings);
+    }
+    if (parsed.ledgerId === "flower") {
+      return normalizeNamedAmountList(state.settings.managedBalances?.flowerChecking);
+    }
+    const scoped = state.settings.accountScopedManagers?.[parsed.ledgerId]?.banks;
+    return normalizeNamedAmountList(scoped);
+  }
+  if (parsed.kind === "personalChecking") {
+    return normalizeNamedAmountList(state.settings.managedBalances?.personalChecking);
   }
   return [];
 }
 
 function setManagedItems(type, items) {
-  if (type === "cardDebts") {
+  const parsed = parseManagedType(type);
+  if (parsed.kind === "cardDebts") {
+    setManagedItems("accountCards:personal", items);
+    return;
+  }
+  if (parsed.kind === "personalSavings") {
+    setManagedItems("accountBanks:personal", items);
+    return;
+  }
+  if (parsed.kind === "flowerChecking") {
+    setManagedItems("accountBanks:flower", items);
+    return;
+  }
+  if (parsed.kind === "accountCards") {
     const normalized = normalizeNamedAmountList(items, {
       allowZero: true,
       amountParser: normalizeLiabilityAmount,
     });
-    state.settings.cardDebts = normalized;
-    state.settings.cardDue = normalized.length ? sumNamedAmountList(normalized) : 0;
+    if (parsed.ledgerId === "personal") {
+      state.settings.cardDebts = normalized;
+      state.settings.cardDue = normalized.length ? sumNamedAmountList(normalized) : 0;
+      return;
+    }
+    const scoped = normalizeAccountScopedManagers(state.settings.accountScopedManagers);
+    state.settings.accountScopedManagers = {
+      ...scoped,
+      [parsed.ledgerId]: {
+        cards: normalized,
+        banks: normalizeNamedAmountList(scoped?.[parsed.ledgerId]?.banks),
+      },
+    };
     return;
   }
-  if (type === "personalChecking" || type === "personalSavings" || type === "flowerChecking") {
+  if (parsed.kind === "accountBanks") {
+    const normalized = normalizeNamedAmountList(items);
+    if (parsed.ledgerId === "personal") {
+      state.settings.managedBalances = {
+        ...state.settings.managedBalances,
+        personalSavings: normalized,
+      };
+      state.settings.openingBalances = {
+        ...state.settings.openingBalances,
+        personalSavings: normalized.length ? sumNamedAmountList(normalized) : 0,
+      };
+      return;
+    }
+    if (parsed.ledgerId === "flower") {
+      state.settings.managedBalances = {
+        ...state.settings.managedBalances,
+        flowerChecking: normalized,
+      };
+      state.settings.openingBalances = {
+        ...state.settings.openingBalances,
+        flowerChecking: normalized.length ? sumNamedAmountList(normalized) : 0,
+      };
+      return;
+    }
+    const scoped = normalizeAccountScopedManagers(state.settings.accountScopedManagers);
+    state.settings.accountScopedManagers = {
+      ...scoped,
+      [parsed.ledgerId]: {
+        cards: normalizeNamedAmountList(scoped?.[parsed.ledgerId]?.cards, {
+          allowZero: true,
+          amountParser: normalizeLiabilityAmount,
+        }),
+        banks: normalized,
+      },
+    };
+    return;
+  }
+  if (parsed.kind === "personalChecking") {
     const normalized = normalizeNamedAmountList(items);
     state.settings.managedBalances = {
       ...state.settings.managedBalances,
-      [type]: normalized,
+      personalChecking: normalized,
     };
     state.settings.openingBalances = {
       ...state.settings.openingBalances,
-      [type]: normalized.length ? sumNamedAmountList(normalized) : 0,
+      personalChecking: normalized.length ? sumNamedAmountList(normalized) : 0,
     };
   }
 }
@@ -5600,12 +7240,12 @@ function loadSyncConfig() {
   try {
     const raw = localStorage.getItem(SYNC_CONFIG_KEY);
     if (!raw) {
-      return { ...DEFAULT_SYNC_CONFIG };
+      return normalizeSyncConfig(DEFAULT_SYNC_CONFIG);
     }
     const parsed = JSON.parse(raw);
     return normalizeSyncConfig(parsed);
   } catch {
-    return { ...DEFAULT_SYNC_CONFIG };
+    return normalizeSyncConfig(DEFAULT_SYNC_CONFIG);
   }
 }
 
@@ -5618,6 +7258,15 @@ function saveSyncConfig() {
 }
 
 function normalizeSyncConfig(input) {
+  if (SYNC_AUTO_MANAGED) {
+    const intervalSec = Math.max(10, Math.min(600, Number(input?.intervalSec) || DEFAULT_SYNC_CONFIG.intervalSec));
+    return {
+      enabled: true,
+      endpoint: SUPABASE_DEFAULT_ENDPOINT,
+      token: SUPABASE_DEFAULT_PUBLISHABLE_KEY,
+      intervalSec,
+    };
+  }
   const endpoint = normalizeSyncEndpoint(input?.endpoint);
   const token = String(input?.token || "").trim();
   const intervalSec = Math.max(10, Math.min(600, Number(input?.intervalSec) || DEFAULT_SYNC_CONFIG.intervalSec));
@@ -5770,6 +7419,9 @@ function normalizeSettings(input) {
       amountParser: normalizeLiabilityAmount,
     });
   }
+  if (input?.accountScopedManagers && typeof input.accountScopedManagers === "object") {
+    settings.accountScopedManagers = normalizeAccountScopedManagers(input.accountScopedManagers);
+  }
   if (!settings.cardDebts.length && legacyManagedChecking.length) {
     settings.cardDebts = normalizeNamedAmountList(legacyManagedChecking, {
       allowZero: true,
@@ -5823,16 +7475,79 @@ function normalizeSettings(input) {
         keyword: String(rule.keyword || "").trim().toLowerCase(),
         merchant: String(rule.merchant || "").trim(),
         category: String(rule.category || "").trim(),
-        ledger: ["auto", "personal", "flower"].includes(rule.ledger) ? rule.ledger : "auto",
+        ledger: cleanText(rule.ledger, "auto"),
         kind: ["auto", "expense", "income", "transfer"].includes(rule.kind) ? rule.kind : "auto",
       }))
-      .filter((rule) => rule.keyword);
+      .filter((rule) => rule.keyword)
+      .map((rule) => ({
+        ...rule,
+        ledger: rule.ledger === "auto" ? "auto" : cleanText(rule.ledger, "auto"),
+      }));
+  }
+  if (input?.userProfile && typeof input.userProfile === "object") {
+    settings.userProfile = normalizeUserProfile(input.userProfile);
+  } else {
+    settings.userProfile = normalizeUserProfile(settings.userProfile);
   }
 
   settings.categories = normalizeCategoryList(settings.categories);
   settings.categoryKeywords = normalizeCategoryKeywordMap(settings.categoryKeywords, settings.categories);
 
   return settings;
+}
+
+function normalizeUserProfile(input) {
+  const merged = {
+    ...DEFAULT_USER_PROFILE,
+    ...(input || {}),
+  };
+  const records = Array.isArray(merged.records)
+    ? merged.records.map((name) => cleanText(name, "")).filter(Boolean)
+    : [];
+  const normalizedRecords = records.length
+    ? records
+    : [
+        cleanText(merged.personalLedgerName, DEFAULT_USER_PROFILE.personalLedgerName),
+        cleanText(merged.flowerLedgerName, DEFAULT_USER_PROFILE.flowerLedgerName),
+      ];
+
+  const combinedConfigs = Array.isArray(merged.combinedConfigs)
+    ? merged.combinedConfigs
+        .map((cfg) => ({
+          name: cleanText(cfg?.name, ""),
+          members: Array.isArray(cfg?.members)
+            ? cfg.members.map((member) => cleanText(member, "")).filter((member) => normalizedRecords.includes(member))
+            : [],
+        }))
+        .filter((cfg) => cfg.name && cfg.members.length >= 2)
+    : [];
+
+  const fallbackCombined =
+    Boolean(merged.combinedEnabled) && cleanText(merged.combinedLedgerName, "")
+      ? [
+          {
+            name: cleanText(merged.combinedLedgerName, DEFAULT_USER_PROFILE.combinedLedgerName),
+            members: normalizedRecords.slice(0, 2),
+          },
+        ]
+      : [];
+  const resolvedCombined = combinedConfigs.length ? combinedConfigs : fallbackCombined;
+
+  const normalizedAccountsTabName = (() => {
+    const raw = cleanText(merged.accountsTabName, DEFAULT_USER_PROFILE.accountsTabName);
+    return raw === "통장" ? DEFAULT_USER_PROFILE.accountsTabName : raw;
+  })();
+
+  return {
+    onboardingDone: Boolean(merged.onboardingDone),
+    records: normalizedRecords,
+    combinedConfigs: resolvedCombined,
+    personalLedgerName: cleanText(normalizedRecords[0], DEFAULT_USER_PROFILE.personalLedgerName),
+    flowerLedgerName: cleanText(normalizedRecords[1], DEFAULT_USER_PROFILE.flowerLedgerName),
+    accountsTabName: normalizedAccountsTabName,
+    combinedEnabled: Boolean(resolvedCombined.length),
+    combinedLedgerName: cleanText(resolvedCombined[0]?.name, DEFAULT_USER_PROFILE.combinedLedgerName),
+  };
 }
 
 function uniqueStrings(values) {
@@ -5877,7 +7592,7 @@ function normalizeTransaction(item) {
   }
 
   const kind = ["expense", "income", "transfer"].includes(item.kind) ? item.kind : "expense";
-  const ledger = item.ledger === "flower" ? "flower" : "personal";
+  const ledger = cleanText(item.ledger, "personal");
   const amount = Math.abs(Number(item.amount));
   if (!Number.isFinite(amount) || amount <= 0) {
     return null;

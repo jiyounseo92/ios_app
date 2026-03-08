@@ -1,4 +1,4 @@
-const CACHE_NAME = "mongle-ledger-cache-v51";
+const CACHE_NAME = "mongle-ledger-cache-v56";
 const ASSETS = [
   "./",
   "./index.html",
@@ -29,6 +29,7 @@ self.addEventListener("install", (event) => {
       return cache.addAll(ASSETS);
     })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -44,6 +45,7 @@ self.addEventListener("activate", (event) => {
       );
     })
   );
+  self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {

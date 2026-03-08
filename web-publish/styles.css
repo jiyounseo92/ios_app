@@ -45,6 +45,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -640,6 +644,16 @@ body.view-home-mode .home-friend-dock {
 
 .sync-card .setup-form {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sync-card .setup-form label {
+  min-width: 0;
+}
+
+.sync-card input,
+.sync-card select {
+  width: 100%;
+  min-width: 0;
 }
 
 .sync-checkbox {
@@ -1469,6 +1483,27 @@ details[open] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.onboarding-account-manager-note {
+  margin-top: 4px;
+}
+
+.onboarding-account-manager-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.onboarding-manager-done-btn {
+  border: 0;
+  border-radius: 12px;
+  background: #346d4a;
+  color: #fff;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 1rem;
+  padding: 10px 18px;
+  cursor: pointer;
 }
 
 .accounts-manager-panel {
@@ -2338,6 +2373,17 @@ details[open] {
     display: grid;
   }
 
+  .sync-card .setup-form {
+    grid-template-columns: 1fr;
+  }
+
+  .sync-card .setup-form label,
+  .sync-card .sync-checkbox,
+  .sync-card .sync-actions,
+  .sync-card .sync-status {
+    grid-column: 1 / -1;
+  }
+
   .scope-buttons {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2602,5 +2648,439 @@ details[open] {
   .delete-btn {
     grid-column: span 5;
     justify-self: end;
+  }
+}
+
+body.onboarding-active {
+  overflow: hidden;
+}
+
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  color: #fff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+}
+
+.onboarding-overlay.show-setup {
+  align-items: flex-start;
+}
+
+.onboarding-intro {
+  width: min(920px, 100%);
+  min-height: calc(100vh - 32px);
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 20px;
+}
+
+.onboarding-intro .onboarding-title,
+.onboarding-intro .onboarding-sub {
+  transition:
+    opacity 700ms ease,
+    transform 700ms ease;
+}
+
+.onboarding-intro .onboarding-tap {
+  transition:
+    opacity 700ms ease,
+    transform 700ms ease;
+}
+
+.onboarding-intro.is-transitioning .onboarding-title,
+.onboarding-intro.is-transitioning .onboarding-sub {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.onboarding-intro.is-transitioning .onboarding-tap {
+  opacity: 0;
+  transform: translateX(-50%) translateY(14px);
+}
+
+.onboarding-intro.is-hiding {
+  opacity: 0;
+  transition: opacity 740ms ease;
+}
+
+.onboarding-title {
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: clamp(2rem, 4.8vw, 3.3rem);
+  line-height: 1.2;
+}
+
+.onboarding-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.intro-title-char {
+  width: clamp(42px, 5.6vw, 62px);
+  height: clamp(42px, 5.6vw, 62px);
+}
+
+.onboarding-sub {
+  min-height: 24px;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: clamp(1.2rem, 2.9vw, 2rem);
+  line-height: 1.35;
+  margin-top: 6px;
+}
+
+.onboarding-sub-small {
+  display: block;
+  margin-top: 8px;
+  font-family: "BMKkubulim", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 0.92rem;
+  opacity: 0.9;
+}
+
+.onboarding-tap {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  margin-top: 0;
+  opacity: 0.75;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.onboarding-setup {
+  width: min(900px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  background: #111;
+  padding: 16px;
+}
+
+.onboarding-setup-head {
+  margin-bottom: 12px;
+  position: sticky;
+  top: -16px;
+  z-index: 2;
+  background: #111;
+  padding: 0 0 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.onboarding-setup-head h2 {
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 1.65rem;
+  color: #fff;
+}
+
+.onboarding-setup-head p {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.9rem;
+}
+
+.onboarding-form {
+  display: grid;
+  gap: 12px;
+}
+
+.onboarding-block {
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  background: #1a1a1a;
+  padding: 12px;
+}
+
+.onboarding-block h3 {
+  color: #fff;
+  margin-bottom: 8px;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+}
+
+.title-with-char {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-char {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  object-fit: contain;
+}
+
+.mini-char.intro-title-char {
+  width: 36px !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+}
+
+.onboarding-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.onboarding-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.onboarding-form label {
+  display: grid;
+  gap: 6px;
+  color: #fff;
+  font-family: "BMKkubulim", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 0.9rem;
+}
+
+.onboarding-form input,
+.onboarding-form select,
+.onboarding-form textarea {
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  color: #111;
+  padding: 10px 12px;
+  font-family: "GmarketSans Regular", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 0.92rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.onboarding-form textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
+.onboarding-submit {
+  border: 0;
+  border-radius: 14px;
+  background: #346d4a;
+  color: #fff;
+  padding: 12px 14px;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.onboarding-submit-top {
+  justify-self: start;
+  padding: 9px 12px;
+  font-size: 0.92rem;
+}
+
+.onboard-add-btn {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: #346d4a;
+  color: #fff;
+  padding: 8px 11px;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.onboard-entry-list {
+  display: grid;
+  gap: 8px;
+}
+
+.onboard-entry-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.onboard-entry-row button[data-onboard-entry-remove] {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 10px;
+  background: #346d4a;
+  color: #fff;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+}
+
+.onboard-ledger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.onboard-ledger-row button[data-onboard-ledger-remove],
+.onboard-combined-row button[data-onboard-combined-remove] {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 10px;
+  background: #346d4a;
+  color: #fff;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+}
+
+.onboard-combined-row {
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.onboard-combined-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.onboard-member-chip {
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #fff;
+  font-size: 0.78rem;
+}
+
+.onboard-member-chip input {
+  width: auto;
+  min-width: 0;
+}
+
+.profile-setup-form {
+  gap: 12px;
+}
+
+.profile-config-block {
+  border-radius: 14px;
+  border: 1px solid #d8d8d8;
+  background: #f6f6f6;
+  padding: 10px;
+}
+
+.profile-config-block h3 {
+  margin: 0 0 8px;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+  font-size: 1rem;
+  color: #222;
+}
+
+.label-title-with-char {
+  margin-bottom: 4px;
+}
+
+.profile-config-block .onboard-add-btn {
+  margin-top: 8px;
+  border: 0;
+  background: #346d4a;
+  color: #fff;
+}
+
+.profile-ledger-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.profile-ledger-row button[data-profile-ledger-remove],
+.profile-combined-row button[data-profile-combined-remove] {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 10px;
+  background: #346d4a;
+  color: #fff;
+  font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
+}
+
+.profile-combined-row {
+  border: 1px solid #d7d7d7;
+  border-radius: 12px;
+  background: #fff;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.profile-combined-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.profile-member-chip {
+  border: 1px solid #cecece;
+  border-radius: 999px;
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #222;
+  font-size: 0.78rem;
+  background: #fff;
+}
+
+.profile-member-chip input {
+  width: auto;
+  min-width: 0;
+}
+
+.onboarding-block-template {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .onboarding-grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-title {
+    font-size: 2rem;
+  }
+
+  .onboarding-sub {
+    font-size: 1.2rem;
+  }
+
+  .onboarding-tap {
+    bottom: 12px;
+    font-size: 0.74rem;
+  }
+
+  .onboard-entry-row {
+    grid-template-columns: 1fr;
+  }
+
+  .onboard-ledger-row {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-ledger-row {
+    grid-template-columns: 1fr;
+  }
+
+  .onboarding-setup {
+    padding: 12px;
   }
 }
