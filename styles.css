@@ -495,13 +495,50 @@ body.view-home-mode .home-friend-dock {
 
 #quick-form {
   display: grid;
-  grid-template-columns: 1fr 78px;
+  grid-template-columns: 56px minmax(0, 1fr) 78px;
   gap: 12px;
+  align-items: end;
 }
 
 .quick-kind-picker {
   position: relative;
   display: none;
+}
+
+.quick-date-wrap {
+  position: relative;
+  width: 56px;
+  height: 58px;
+}
+
+.quick-date-hint {
+  position: absolute;
+  top: -20px;
+  left: -4px;
+  color: var(--white);
+  font-size: 0.9rem;
+  line-height: 1;
+  font-family: "BMKkubulim", "JejuDoldam", "Pretendard", sans-serif;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.quick-date-btn {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.94);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.quick-date-btn img {
+  width: 44px;
+  height: 44px;
+  display: block;
 }
 
 .quick-account-wrap {
@@ -2483,8 +2520,30 @@ details[open] {
   }
 
   #quick-form {
-    grid-template-columns: minmax(0, 1fr) 48px;
+    grid-template-columns: 42px minmax(0, 1fr) 48px;
     gap: 6px;
+  }
+
+  .quick-date-wrap {
+    width: 42px;
+    height: 42px;
+  }
+
+  .quick-date-hint {
+    top: -16px;
+    left: -6px;
+    font-size: 0.72rem;
+  }
+
+  .quick-date-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  .quick-date-btn img {
+    width: 33px;
+    height: 33px;
   }
 
   .quick-kind-button,
@@ -2806,8 +2865,8 @@ body.onboarding-active {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: 22px;
-  border: 2px solid rgba(255, 255, 255, 0.28);
-  background: #111;
+  border: 0;
+  background: transparent;
   padding: 16px;
 }
 
@@ -2816,10 +2875,12 @@ body.onboarding-active {
   position: sticky;
   top: -16px;
   z-index: 2;
-  background: #111;
+  background: transparent;
   padding: 0 0 10px;
   display: grid;
   gap: 6px;
+  justify-items: center;
+  text-align: center;
 }
 
 .onboarding-setup-head h2 {
@@ -2840,23 +2901,31 @@ body.onboarding-active {
 }
 
 .onboarding-join-card {
-  border-radius: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.24);
-  background: #1a1a1a;
-  padding: 12px;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  padding: 2px 0 0;
   margin-bottom: 12px;
   display: grid;
   gap: 10px;
+  justify-items: center;
+  text-align: center;
 }
 
 .onboarding-join-card .hint {
   color: rgba(255, 255, 255, 0.86);
+  text-align: center;
+}
+
+.onboarding-join-card .title-with-char {
+  justify-content: center;
 }
 
 .onboarding-join-card input {
-  border: 0;
+  width: min(460px, 100%);
+  border: 2px solid rgba(255, 255, 255, 0.34);
   border-radius: 12px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.96);
   color: #111;
   padding: 10px 12px;
   font-family: "GmarketSans Regular", "Pretendard", "Noto Sans KR", sans-serif;
@@ -2865,14 +2934,25 @@ body.onboarding-active {
 
 .onboarding-join-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  justify-content: center;
+}
+
+.onboarding-start-new-wrap {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0 12px;
+}
+
+.onboarding-start-new-btn {
+  background: #106aa9;
+  color: #fff;
+  border: 0;
 }
 
 .onboarding-block {
   border-radius: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.24);
-  background: #1a1a1a;
+  border: 0;
+  background: rgba(26, 26, 26, 0.86);
   padding: 12px;
 }
 
@@ -3040,8 +3120,8 @@ body.onboarding-active {
 
 .profile-config-block {
   border-radius: 14px;
-  border: 1px solid #d8d8d8;
-  background: #f6f6f6;
+  border: 0;
+  background: rgba(255, 255, 255, 0.78);
   padding: 10px;
 }
 
@@ -3081,9 +3161,9 @@ body.onboarding-active {
 }
 
 .profile-combined-row {
-  border: 1px solid #d7d7d7;
+  border: 0;
   border-radius: 12px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.92);
   padding: 8px;
   display: grid;
   gap: 8px;
@@ -3096,7 +3176,7 @@ body.onboarding-active {
 }
 
 .profile-member-chip {
-  border: 1px solid #cecece;
+  border: 0;
   border-radius: 999px;
   padding: 4px 9px;
   display: inline-flex;
@@ -3105,6 +3185,26 @@ body.onboarding-active {
   color: #222;
   font-size: 0.78rem;
   background: #fff;
+}
+
+.view-settings.card {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 8px 0;
+}
+
+.view-settings .keyword-block,
+.view-settings .category-manage-editor {
+  border: 0;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+#settings-account-manager-card .accounts-manager-panel,
+#settings-account-manager-card .accounts-manager-item {
+  border: 0;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: none;
 }
 
 .profile-member-chip input {

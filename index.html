@@ -160,7 +160,7 @@
     </script>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/icon-192.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=66" />
+    <link rel="stylesheet" href="styles.css?v=68" />
     <title>포켓 가계부</title>
   </head>
   <body>
@@ -184,11 +184,12 @@
           <input id="onboarding-share-code" type="text" placeholder="공유 비밀번호 입력" autocomplete="off" />
           <div class="onboarding-join-actions">
             <button id="onboarding-share-join-btn" type="button" class="onboard-add-btn">공유 기록 열기</button>
-            <button id="onboarding-start-new-btn" type="button" class="onboard-add-btn">새로 시작</button>
           </div>
           <p id="onboarding-share-status" class="hint"></p>
-          <p class="hint">새로 시작을 누르면 아래 설정으로 이동해요.</p>
         </section>
+        <div class="onboarding-start-new-wrap">
+          <button id="onboarding-start-new-btn" type="button" class="onboard-add-btn onboarding-start-new-btn">새로 시작</button>
+        </div>
         <form id="onboarding-form" class="onboarding-form" autocomplete="off" novalidate>
           <article class="onboarding-block">
             <h3 class="title-with-char"><img src="assets/chars/blue.svg" class="mini-char" alt="" /><span>계정 이름</span></h3>
@@ -260,6 +261,12 @@
                 <option value="flower-cash">꽃 현금</option>
               </select>
             </div>
+            <div class="quick-date-wrap">
+              <span class="quick-date-hint">↘ Click!</span>
+              <button id="quick-date-btn" type="button" class="quick-date-btn" title="오늘 날짜 입력">
+                <img src="assets/chars/yellow.svg" alt="오늘 날짜 입력" />
+              </button>
+            </div>
             <label class="sr-only" for="quick-input">거래 입력</label>
             <input
               id="quick-input"
@@ -296,17 +303,13 @@
               <img src="assets/chars/blue.svg" alt="" />
               <span class="mobile-friend-label">홈</span>
             </button>
-            <button class="mobile-friend-item" data-friend="friendB" data-label="장부보기" type="button">
+            <button class="mobile-friend-item" data-friend="friendB" data-label="포켓보기" type="button">
               <img src="assets/chars/pink.svg" alt="" />
-              <span class="mobile-friend-label">장부보기</span>
+              <span class="mobile-friend-label">포켓보기</span>
             </button>
             <button class="mobile-friend-item" data-friend="friendC" data-label="설정" type="button">
               <img src="assets/chars/green.svg" alt="" />
               <span class="mobile-friend-label">설정</span>
-            </button>
-            <button class="mobile-friend-item" data-friend="friendD" data-label="오늘 날짜" type="button">
-              <img src="assets/chars/yellow.svg" alt="" />
-              <span class="mobile-friend-label">오늘 날짜</span>
             </button>
           </div>
         </div>
@@ -325,17 +328,13 @@
             <img src="assets/chars/blue.svg" alt="" />
             <span class="mobile-friend-label">홈</span>
           </button>
-          <button class="mobile-friend-item" data-friend="friendB" data-label="장부보기" type="button">
+          <button class="mobile-friend-item" data-friend="friendB" data-label="포켓보기" type="button">
             <img src="assets/chars/pink.svg" alt="" />
-            <span class="mobile-friend-label">장부보기</span>
+            <span class="mobile-friend-label">포켓보기</span>
           </button>
           <button class="mobile-friend-item" data-friend="friendC" data-label="설정" type="button">
             <img src="assets/chars/green.svg" alt="" />
             <span class="mobile-friend-label">설정</span>
-          </button>
-          <button class="mobile-friend-item" data-friend="friendD" data-label="오늘 날짜" type="button">
-            <img src="assets/chars/yellow.svg" alt="" />
-            <span class="mobile-friend-label">오늘 날짜</span>
           </button>
         </div>
       </div>
@@ -394,10 +393,9 @@
 
       <section class="card scope-card view-ledger" hidden>
         <div class="section-title-row">
-          <p class="hint">입력은 자동 분류, 화면은 장부별로 확인</p>
         </div>
         <div id="scope-buttons" class="scope-buttons" role="tablist" aria-label="장부 전환">
-          <button class="scope-btn active" data-scope="personal" type="button">개인 장부</button>
+          <button class="scope-btn active" data-scope="personal" type="button">개인</button>
           <button class="scope-btn" data-scope="flower" type="button">Blessom Flower</button>
           <button class="scope-btn" data-scope="combined" type="button" hidden>총 장부</button>
           <button class="scope-btn" data-scope="accounts" type="button">통장/카드</button>
@@ -539,15 +537,6 @@
         <div id="category-color-list" class="category-color-list"></div>
       </section>
 
-      <section class="card friend-shortcut-card view-settings" hidden>
-        <div class="section-title-row">
-          <h2>캐릭터 숏컷 설정</h2>
-          <p class="hint">가장자리/모바일 캐릭터 기능 변경</p>
-        </div>
-        <p class="hint">오늘 날짜 입력 숏컷은 항상 최소 1개 유지돼요.</p>
-        <div id="friend-shortcut-list" class="friend-shortcut-list"></div>
-      </section>
-
       <section class="card sync-card view-settings" hidden>
         <div class="section-title-row">
           <h2>웹/모바일 자동 연동</h2>
@@ -583,7 +572,6 @@
       <section id="history-card" class="card history-card view-ledger" hidden>
         <div class="section-title-row">
           <h2>최근 기록</h2>
-          <p class="hint">현재 선택 장부의 이번 달 내역</p>
         </div>
         <ul id="history-list" class="history-list"></ul>
       </section>
@@ -746,6 +734,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=77"></script>
+    <script src="app.js?v=80"></script>
   </body>
 </html>

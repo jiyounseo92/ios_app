@@ -136,22 +136,22 @@ const FRIEND_KEY_META = {
 
 const FRIEND_ACTION_LABEL = {
   "open-home": "홈 화면 열기",
-  "open-ledger": "장부보기 열기",
+  "open-ledger": "포켓보기 열기",
   "open-settings": "설정 탭 열기",
   "date-prefix": "오늘 날짜 붙이기",
-  "scope-personal": "개인 장부 열기",
-  "scope-flower": "꽃 장부 열기",
+  "scope-personal": "개인 열기",
+  "scope-flower": "꽃 열기",
   "cash-prefix": "현금 입력 시작",
   "toggle-friends": "캐릭터 보이기/숨기기",
 };
 
 const FRIEND_ACTION_BADGE = {
   "open-home": "홈",
-  "open-ledger": "장부보기",
+  "open-ledger": "포켓보기",
   "open-settings": "설정",
   "date-prefix": "오늘 날짜",
-  "scope-personal": "개인 장부",
-  "scope-flower": "꽃 장부",
+  "scope-personal": "개인",
+  "scope-flower": "꽃",
   "cash-prefix": "현금 입력",
   "toggle-friends": "캐릭터 숨김",
 };
@@ -413,6 +413,7 @@ const quickKindButtonEl = document.getElementById("quick-kind-button");
 const quickKindLabelEl = document.getElementById("quick-kind-label");
 const quickKindMenuEl = document.getElementById("quick-kind-menu");
 const quickInput = document.getElementById("quick-input");
+const quickDateBtnEl = document.getElementById("quick-date-btn");
 const quickAccountEl = document.getElementById("quick-account");
 const quickAccountToggleEl = document.getElementById("quick-account-toggle");
 const quickCardEl = document.getElementById("quick-card");
@@ -798,8 +799,8 @@ function applyDynamicLabels() {
   ACCOUNT_LABEL.flowerCash = `${profile.flowerLedgerName} 현금`;
   ACCOUNT_LABEL.flowerMain = `${profile.flowerLedgerName} 소비통장`;
 
-  FRIEND_ACTION_LABEL["scope-personal"] = `${profile.personalLedgerName} 장부 열기`;
-  FRIEND_ACTION_LABEL["scope-flower"] = `${profile.flowerLedgerName} 장부 열기`;
+  FRIEND_ACTION_LABEL["scope-personal"] = `${profile.personalLedgerName} 열기`;
+  FRIEND_ACTION_LABEL["scope-flower"] = `${profile.flowerLedgerName} 열기`;
   FRIEND_ACTION_BADGE["scope-personal"] = profile.personalLedgerName;
   FRIEND_ACTION_BADGE["scope-flower"] = profile.flowerLedgerName;
 
@@ -819,7 +820,7 @@ function applyDynamicLabels() {
   const scopeCombined = scopeButtons?.querySelector('button[data-scope="combined"]');
   const scopeAccounts = scopeButtons?.querySelector('button[data-scope="accounts"]');
 
-  if (scopePersonal) scopePersonal.textContent = `${profile.personalLedgerName} 장부`;
+  if (scopePersonal) scopePersonal.textContent = profile.personalLedgerName;
   if (scopeFlower) scopeFlower.textContent = profile.flowerLedgerName;
   const combinedConfigs = getCombinedScopeConfigs();
   if (scopeCombined) {
@@ -1566,12 +1567,12 @@ async function handleOnboardingJoinByCode() {
 
   try {
     const remoteEnvelope = await fetchRemoteEnvelopeFromSupabase();
-    if (!remoteEnvelope) {
-      if (onboardingShareStatusEl) {
-        onboardingShareStatusEl.textContent = "해당 비밀번호의 공유 기록을 찾지 못했어요. 새로 시작을 눌러 설정할 수 있어요.";
+      if (!remoteEnvelope) {
+        if (onboardingShareStatusEl) {
+          onboardingShareStatusEl.textContent = "해당 비밀번호의 공유 기록을 찾지 못했어요.";
+        }
+        return;
       }
-      return;
-    }
 
     applyRemoteEnvelope(remoteEnvelope);
     state.settings.userProfile = normalizeUserProfile({
@@ -1762,6 +1763,9 @@ function init() {
 
   quickForm.addEventListener("submit", handleSubmit);
   quickInput.addEventListener("input", handlePreview);
+  if (quickDateBtnEl) {
+    quickDateBtnEl.addEventListener("click", handleQuickDateClick);
+  }
   if (quickKindSelect) {
     quickKindSelect.addEventListener("change", handleQuickKindChange);
   }
@@ -2299,11 +2303,7 @@ function handleFriendAction(event) {
     render();
   } else if (action === "date-prefix") {
     setCurrentView("home");
-    const prefix = getTodayPrefix();
-    const current = quickInput.value.trim();
-    quickInput.value = /^\d{1,2}[\/.\-]\d{1,2}\b/.test(current) ? current : `${prefix} ${current}`.trim();
-    quickInput.focus();
-    quickInput.dispatchEvent(new Event("input"));
+    applyTodayPrefixToQuickInput();
   } else if (action === "cash-prefix") {
     setCurrentView("home");
     const current = quickInput.value.trim();
@@ -2319,6 +2319,21 @@ function handleFriendAction(event) {
   if ((mobileFriendMenu && !mobileFriendMenu.hidden) || (homeFriendMenu && !homeFriendMenu.hidden)) {
     setAllFriendMenus(false);
   }
+}
+
+function handleQuickDateClick() {
+  applyTodayPrefixToQuickInput();
+}
+
+function applyTodayPrefixToQuickInput() {
+  if (!quickInput) {
+    return;
+  }
+  const prefix = getTodayPrefix();
+  const current = quickInput.value.trim();
+  quickInput.value = /^\d{1,2}[\/.\-]\d{1,2}\b/.test(current) ? current : `${prefix} ${current}`.trim();
+  quickInput.focus();
+  quickInput.dispatchEvent(new Event("input"));
 }
 
 function getTodayPrefix() {
