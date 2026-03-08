@@ -160,7 +160,7 @@
     </script>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/icon-192.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=69" />
+    <link rel="stylesheet" href="styles.css?v=70" />
     <title>포켓 가계부</title>
   </head>
   <body>
@@ -341,8 +341,7 @@
 
       <section class="card view-settings" hidden>
         <div class="section-title-row">
-          <h2>계정 유형 설정</h2>
-          <p class="hint">온보딩에서 정한 이름을 여기서 수정 가능</p>
+          <h2>계정 설정</h2>
         </div>
         <form id="profile-form" class="setup-form profile-setup-form" autocomplete="off">
           <article class="profile-config-block">
@@ -396,7 +395,7 @@
         </div>
         <div id="scope-buttons" class="scope-buttons" role="tablist" aria-label="장부 전환">
           <button class="scope-btn active" data-scope="personal" type="button">개인</button>
-          <button class="scope-btn" data-scope="flower" type="button">Blessom Flower</button>
+          <button class="scope-btn" data-scope="flower" type="button">계정 2</button>
           <button class="scope-btn" data-scope="combined" type="button" hidden>총 장부</button>
           <button class="scope-btn" data-scope="accounts" type="button">통장/카드</button>
         </div>
@@ -540,29 +539,29 @@
       <section class="card sync-card view-settings" hidden>
         <div class="section-title-row">
           <h2>웹/모바일 자동 연동</h2>
-          <p class="hint">공유 비밀번호가 같은 사람들끼리만 동기화돼요.</p>
+          <p class="hint">같은 공유 비밀번호를 쓰면 같은 기록으로 자동 연결돼요.</p>
         </div>
         <form id="sync-form" class="setup-form" autocomplete="off">
           <label>공유 비밀번호
             <input id="sync-room-code" type="text" placeholder="예: blossom2026" />
           </label>
-          <label>Sync URL
+          <label class="sync-advanced" hidden>Sync URL
             <input id="sync-endpoint" type="text" placeholder="https://<project-ref>.supabase.co" />
           </label>
-          <label>Access Token(필수)
+          <label class="sync-advanced" hidden>Access Token(필수)
             <input id="sync-token" type="password" placeholder="sb_publishable_..." />
           </label>
-          <label>동기화 간격(초)
+          <label class="sync-advanced" hidden>동기화 간격(초)
             <input id="sync-interval" type="number" min="10" step="5" value="30" />
           </label>
-          <label class="sync-checkbox">
+          <label class="sync-checkbox sync-advanced" hidden>
             <span>자동 동기화 사용</span>
             <input id="sync-enabled" type="checkbox" />
           </label>
           <div class="sync-actions">
             <button type="submit">공유 비밀번호 저장</button>
-            <button id="sync-copy-link" type="button" class="scope-btn">공유 링크 복사</button>
-            <button id="sync-now" type="button" class="scope-btn">지금 동기화</button>
+            <button id="sync-copy-link" type="button" class="scope-btn">초대 링크 복사</button>
+            <button id="sync-now" type="button" class="scope-btn">동기화</button>
           </div>
           <p id="sync-share-link" class="hint"></p>
           <p id="sync-status" class="hint sync-status">연동이 꺼져 있어요.</p>
@@ -734,6 +733,6 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=81"></script>
+    <script src="app.js?v=82"></script>
   </body>
 </html>

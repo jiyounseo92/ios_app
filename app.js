@@ -95,10 +95,10 @@ const QUICK_KIND_LABEL = {
 
 const DEFAULT_USER_PROFILE = {
   onboardingDone: false,
-  records: ["개인", "Blessom Flower"],
+  records: ["개인"],
   combinedConfigs: [],
   personalLedgerName: "개인",
-  flowerLedgerName: "Blessom Flower",
+  flowerLedgerName: "",
   accountsTabName: "통장/카드",
   combinedEnabled: false,
   combinedLedgerName: "총 장부",
@@ -661,11 +661,44 @@ function getUserProfile() {
     records,
     combinedConfigs,
     personalLedgerName: cleanText(records[0], DEFAULT_USER_PROFILE.personalLedgerName),
-    flowerLedgerName: cleanText(records[1], DEFAULT_USER_PROFILE.flowerLedgerName),
+    flowerLedgerName: cleanText(records[1], ""),
     accountsTabName: cleanText(source.accountsTabName, DEFAULT_USER_PROFILE.accountsTabName),
     combinedEnabled: Boolean(primaryCombined),
     combinedLedgerName: cleanText(primaryCombined?.name, DEFAULT_USER_PROFILE.combinedLedgerName),
   };
+}
+
+function pruneDefaultFlowerLedgerIfUnused() {
+  const profile = normalizeUserProfile(state.settings?.userProfile || {});
+  const isLegacyDefaultPair =
+    Array.isArray(profile.records) &&
+    profile.records.length === 2 &&
+    cleanText(profile.records[0], "") === "개인" &&
+    cleanText(profile.records[1], "") === "Blessom Flower";
+  if (!isLegacyDefaultPair) {
+    return;
+  }
+
+  const hasFlowerTx = Array.isArray(state.transactions)
+    ? state.transactions.some((tx) => tx && (tx.ledger === "flower" || FLOWER_ACCOUNTS.includes(tx.account)))
+    : false;
+  const hasFlowerBalances =
+    normalizeAmount(state.settings?.openingBalances?.flowerChecking) > 0 ||
+    normalizeAmount(state.settings?.openingBalances?.flowerCash) > 0;
+  const hasFlowerManagers = getManagedItems("accountCards:flower").length > 0 || getManagedItems("accountBanks:flower").length > 0;
+
+  if (hasFlowerTx || hasFlowerBalances || hasFlowerManagers) {
+    return;
+  }
+
+  state.settings.userProfile = normalizeUserProfile({
+    ...profile,
+    records: [profile.records[0] || DEFAULT_USER_PROFILE.personalLedgerName],
+    flowerLedgerName: "",
+    combinedConfigs: [],
+    combinedEnabled: false,
+  });
+  saveSettings();
 }
 
 function getLedgerDefinitions() {
@@ -821,7 +854,11 @@ function applyDynamicLabels() {
   const scopeAccounts = scopeButtons?.querySelector('button[data-scope="accounts"]');
 
   if (scopePersonal) scopePersonal.textContent = profile.personalLedgerName;
-  if (scopeFlower) scopeFlower.textContent = profile.flowerLedgerName;
+  const hasFlowerScope = ledgers.some((ledger) => ledger.id === "flower");
+  if (scopeFlower) {
+    scopeFlower.hidden = !hasFlowerScope;
+    scopeFlower.textContent = hasFlowerScope ? profile.flowerLedgerName : "";
+  }
   const combinedConfigs = getCombinedScopeConfigs();
   if (scopeCombined) {
     const firstCombined = combinedConfigs[0] || null;
@@ -1628,7 +1665,7 @@ function handleOnboardingSubmit(event) {
     const recordRows = collectOnboardLedgerRows();
     const records = recordRows.length
       ? recordRows.map((row) => row.name)
-      : [DEFAULT_USER_PROFILE.personalLedgerName, DEFAULT_USER_PROFILE.flowerLedgerName];
+      : [DEFAULT_USER_PROFILE.personalLedgerName];
     const personalName = cleanText(records[0], DEFAULT_USER_PROFILE.personalLedgerName);
     const flowerName = cleanText(records[1], DEFAULT_USER_PROFILE.flowerLedgerName);
     const combinedConfigs = collectOnboardCombinedConfigs();
@@ -1726,7 +1763,7 @@ function handleProfileFormSubmit(event) {
   const recordRows = collectProfileLedgerRows();
   const records = recordRows.length
     ? recordRows.map((row) => row.name)
-    : [DEFAULT_USER_PROFILE.personalLedgerName, DEFAULT_USER_PROFILE.flowerLedgerName];
+    : [DEFAULT_USER_PROFILE.personalLedgerName];
   const personalName = cleanText(records[0], DEFAULT_USER_PROFILE.personalLedgerName);
   const flowerName = cleanText(records[1], DEFAULT_USER_PROFILE.flowerLedgerName);
   const combinedConfigs = collectProfileCombinedConfigs();
@@ -1749,7 +1786,7 @@ function handleProfileFormSubmit(event) {
   renderQuickKindPicker();
   renderQuickAccountToggle();
   render();
-  parserPreview.textContent = "계정 유형 설정을 저장했어요.";
+  parserPreview.textContent = "계정 설정을 저장했어요.";
 }
 
 init();
@@ -1760,6 +1797,7 @@ function init() {
   if (["home", "ledger", "settings"].includes(bootView)) {
     state.currentView = bootView;
   }
+  pruneDefaultFlowerLedgerIfUnused();
 
   quickForm.addEventListener("submit", handleSubmit);
   quickInput.addEventListener("input", handlePreview);
@@ -7768,15 +7806,24 @@ function normalizeUserProfile(input) {
     ...DEFAULT_USER_PROFILE,
     ...(input || {}),
   };
+  if (
+    !merged.onboardingDone &&
+    Array.isArray(merged.records) &&
+    merged.records.length === 2 &&
+    cleanText(merged.records[0], "") === "개인" &&
+    cleanText(merged.records[1], "") === "Blessom Flower"
+  ) {
+    merged.records = ["개인"];
+    merged.flowerLedgerName = "";
+  }
   const records = Array.isArray(merged.records)
     ? merged.records.map((name) => cleanText(name, "")).filter(Boolean)
     : [];
-  const normalizedRecords = records.length
-    ? records
-    : [
-        cleanText(merged.personalLedgerName, DEFAULT_USER_PROFILE.personalLedgerName),
-        cleanText(merged.flowerLedgerName, DEFAULT_USER_PROFILE.flowerLedgerName),
-      ];
+  const fallbackRecords = [
+    cleanText(merged.personalLedgerName, DEFAULT_USER_PROFILE.personalLedgerName),
+    cleanText(merged.flowerLedgerName, ""),
+  ].filter(Boolean);
+  const normalizedRecords = records.length ? records : fallbackRecords.length ? fallbackRecords : [DEFAULT_USER_PROFILE.personalLedgerName];
 
   const combinedConfigs = Array.isArray(merged.combinedConfigs)
     ? merged.combinedConfigs
@@ -7810,7 +7857,7 @@ function normalizeUserProfile(input) {
     records: normalizedRecords,
     combinedConfigs: resolvedCombined,
     personalLedgerName: cleanText(normalizedRecords[0], DEFAULT_USER_PROFILE.personalLedgerName),
-    flowerLedgerName: cleanText(normalizedRecords[1], DEFAULT_USER_PROFILE.flowerLedgerName),
+    flowerLedgerName: cleanText(normalizedRecords[1], ""),
     accountsTabName: normalizedAccountsTabName,
     combinedEnabled: Boolean(resolvedCombined.length),
     combinedLedgerName: cleanText(resolvedCombined[0]?.name, DEFAULT_USER_PROFILE.combinedLedgerName),

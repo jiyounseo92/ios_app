@@ -89,8 +89,8 @@ body {
 }
 
 .app-shell {
-  width: min(1120px, calc(100vw - clamp(26px, 6vw, 76px)));
-  margin: clamp(16px, 2.4vw, 28px) auto 90px;
+  width: min(1060px, calc(100vw - clamp(40px, 8vw, 130px)));
+  margin: clamp(18px, 2.6vw, 34px) auto 90px;
   display: grid;
   gap: 14px;
   position: relative;
@@ -686,7 +686,9 @@ body.view-home-mode .home-friend-dock {
 }
 
 .sync-card .setup-form {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+  max-width: 740px;
+  margin: 0 auto;
 }
 
 .sync-card .setup-form label {
@@ -721,12 +723,14 @@ body.view-home-mode .home-friend-dock {
   gap: 8px;
   align-items: center;
   grid-column: 1 / -1;
+  justify-content: center;
 }
 
 .sync-status {
   margin: 0;
   align-self: center;
   grid-column: 1 / -1;
+  text-align: center;
 }
 
 .sync-status.is-error {
@@ -2412,7 +2416,7 @@ details[open] {
 
 @media (max-width: 640px) {
   .app-shell {
-    width: calc(100vw - 10px);
+    width: calc(100vw - 22px);
     margin: 8px auto 22px;
     gap: 10px;
   }
@@ -2860,14 +2864,14 @@ body.onboarding-active {
 }
 
 .onboarding-setup {
-  width: min(860px, calc(100vw - clamp(26px, 6vw, 76px)));
+  width: min(840px, calc(100vw - clamp(40px, 8vw, 130px)));
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: 22px;
   border: 0;
   background: transparent;
-  padding: 16px;
+  padding: clamp(20px, 4vw, 36px) clamp(18px, 4.8vw, 56px);
 }
 
 .onboarding-setup-head {
@@ -2897,7 +2901,9 @@ body.onboarding-active {
 
 .onboarding-form {
   display: grid;
-  gap: 12px;
+  gap: 14px;
+  max-width: 760px;
+  margin: 0 auto;
 }
 
 .onboarding-join-card {
@@ -3191,7 +3197,7 @@ body.onboarding-active {
   background: transparent;
   border: 0;
   box-shadow: none;
-  padding: 8px clamp(6px, 1.8vw, 18px);
+  padding: clamp(14px, 2.4vw, 26px) clamp(14px, 3.2vw, 34px);
 }
 
 .view-settings .keyword-block,
@@ -3205,6 +3211,10 @@ body.onboarding-active {
   border: 0;
   background: rgba(255, 255, 255, 0.86);
   box-shadow: none;
+}
+
+#settings-account-manager-card .accounts-manage-grid {
+  margin-top: 14px;
 }
 
 .profile-member-chip input {
@@ -3247,6 +3257,7 @@ body.onboarding-active {
   }
 
   .onboarding-setup {
-    padding: 12px;
+    width: calc(100vw - 22px);
+    padding: 16px 14px;
   }
 }
