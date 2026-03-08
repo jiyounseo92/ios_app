@@ -2697,6 +2697,12 @@ body.onboarding-active {
     transform 700ms ease;
 }
 
+.onboarding-intro .intro-title-char {
+  transition:
+    opacity 700ms ease,
+    transform 700ms ease;
+}
+
 .onboarding-intro .onboarding-tap {
   transition:
     opacity 700ms ease,
@@ -2707,6 +2713,11 @@ body.onboarding-active {
 .onboarding-intro.is-transitioning .onboarding-sub {
   opacity: 0;
   transform: translateY(14px);
+}
+
+.onboarding-intro.is-transitioning .intro-title-char {
+  opacity: 0;
+  transform: translateY(14px) scale(0.96);
 }
 
 .onboarding-intro.is-transitioning .onboarding-tap {
@@ -2723,6 +2734,7 @@ body.onboarding-active {
   font-family: "JejuDoldam", "Pretendard", "Noto Sans KR", sans-serif;
   font-size: clamp(2rem, 4.8vw, 3.3rem);
   line-height: 1.2;
+  white-space: pre-line;
 }
 
 .onboarding-title-wrap {

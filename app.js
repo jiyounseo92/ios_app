@@ -594,7 +594,7 @@ const ruleListEl = document.getElementById("rule-list");
 
 const ONBOARDING_STEPS = [
   { title: "환영합니다!", sub: "" },
-  { title: "설정을 시작해 볼까요?", sub: "" },
+  { title: "간단한 설정을\n시작해 볼까요?", sub: "" },
   {
     title: "사용할 계정을 설정해주세요!",
     sub: "<span class=\"onboarding-sub-small\">‘설정’ 탭에서 언제든 변경할 수 있습니다.</span>",
