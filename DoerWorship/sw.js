@@ -1,4 +1,4 @@
-const CACHE_NAME = "doer-worship-v40";
+const CACHE_NAME = "doer-worship-v41";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,6 +9,9 @@ const ASSETS = [
   "./manifest.json",
   "./assets/brand/icon-1.png",
   "./assets/brand/icon-2.png",
+  "./assets/brand/icon-door-white-192.png",
+  "./assets/brand/icon-door-white-512.png",
+  "./assets/brand/apple-touch-door-white-180.png",
   "./assets/logo/simple-1.png",
   "./assets/logo/simple-2.png",
   "./assets/logo/full-logo.png",
