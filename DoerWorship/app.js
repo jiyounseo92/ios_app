@@ -5727,6 +5727,7 @@ function renderStartupSlide() {
     return;
   }
 
+  els.startupSlide.classList.toggle("is-always", slide.variant === "always");
   els.startupSlide.innerHTML = slide.html;
   els.startupInstruction.textContent =
     state.startup.index >= state.startup.slides.length - 1
@@ -5761,12 +5762,13 @@ function buildFirstRunSlides() {
 
 function buildAlwaysSlide() {
   return [
-    makeStartupImageSlide("assets/startup/always-start.png", "항상시작"),
+    makeStartupImageSlide("assets/startup/always-start.png", "항상시작", "always"),
   ];
 }
 
-function makeStartupImageSlide(src, alt) {
+function makeStartupImageSlide(src, alt, variant = "default") {
   return {
+    variant,
     html: `<img class="startup-image" src="${src}" alt="${alt}" />`,
   };
 }

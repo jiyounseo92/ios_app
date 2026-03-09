@@ -100,6 +100,10 @@ th,
   transition: opacity 820ms ease, transform 820ms ease;
 }
 
+.startup-slide.is-always {
+  width: min(1490px, 92vw);
+}
+
 .startup-slide.is-fading {
   opacity: 0;
   transform: translateY(16px);
@@ -112,6 +116,10 @@ th,
   display: block;
   margin: 0 auto;
   object-fit: contain;
+}
+
+.startup-slide.is-always .startup-image {
+  max-height: 92vh;
 }
 
 .startup-instruction {
@@ -1785,8 +1793,16 @@ button {
     width: min(560px, 82vw);
   }
 
+  .startup-slide.is-always {
+    width: min(1120px, 96vw);
+  }
+
   .startup-image {
     max-height: 48vh;
+  }
+
+  .startup-slide.is-always .startup-image {
+    max-height: 84vh;
   }
 
   .about-image-wrap img {
