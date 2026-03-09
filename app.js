@@ -1611,7 +1611,7 @@ async function handleOnboardingJoinByCode() {
         return;
       }
 
-    applyRemoteEnvelope(remoteEnvelope);
+    applyRemoteEnvelope(remoteEnvelope, { mergeLocal: false });
     state.settings.userProfile = normalizeUserProfile({
       ...(state.settings.userProfile || {}),
       onboardingDone: true,
@@ -3811,11 +3811,12 @@ function formatSyncDateTime(timestamp) {
   });
 }
 
-function handleSyncFormSubmit(event) {
+async function handleSyncFormSubmit(event) {
   event.preventDefault();
   if (!syncEndpointEl || !syncTokenEl || !syncIntervalEl || !syncEnabledEl) {
     return;
   }
+  const previousRoomCode = normalizeShareRoomCode(syncRuntime.config?.roomCode || "");
   syncRuntime.config = normalizeSyncConfig({
     enabled: syncEnabledEl.checked,
     endpoint: syncEndpointEl.value,
@@ -3823,17 +3824,52 @@ function handleSyncFormSubmit(event) {
     roomCode: syncRoomCodeEl ? syncRoomCodeEl.value : syncRuntime.config.roomCode,
     intervalSec: Number(syncIntervalEl.value),
   });
+  const nextRoomCode = normalizeShareRoomCode(syncRuntime.config.roomCode || "");
+  const roomChanged = previousRoomCode !== nextRoomCode;
+
+  if (roomChanged) {
+    syncRuntime.meta.lastLocalUpdatedAt = 0;
+    syncRuntime.meta.lastSyncAt = 0;
+    syncRuntime.meta.lastResult = "idle";
+    syncRuntime.meta.lastError = "";
+    saveSyncMeta();
+  }
+
   saveSyncConfig();
   populateSyncForm();
   renderSyncStatus();
-  if (!normalizeShareRoomCode(syncRuntime.config.roomCode)) {
+  if (!nextRoomCode) {
     parserPreview.textContent = "공유 비밀번호를 입력하면 동기화가 시작돼요.";
     return;
   }
-  parserPreview.textContent = "공유 설정을 저장했어요.";
+  parserPreview.textContent = roomChanged ? "공유 비밀번호를 변경했어요. 기존 공유 기록을 확인 중..." : "공유 설정을 저장했어요.";
   startSyncPolling();
   if (isSyncRunnable()) {
-    triggerSync({ reason: "config-save", urgent: true });
+    if (roomChanged) {
+      try {
+        const remoteEnvelope = await fetchRemoteEnvelope();
+        if (remoteEnvelope) {
+          applyRemoteEnvelope(remoteEnvelope, { mergeLocal: false });
+          syncRuntime.meta.lastSyncAt = Date.now();
+          syncRuntime.meta.lastResult = "pull";
+          syncRuntime.meta.lastError = "";
+          saveSyncMeta();
+          renderSyncStatus();
+          parserPreview.textContent = "기존 공유 기록을 불러왔어요.";
+        } else {
+          parserPreview.textContent = "해당 공유 비밀번호의 기존 기록이 없어서 새 공유 기록으로 시작해요.";
+        }
+      } catch (error) {
+        syncRuntime.meta.lastSyncAt = Date.now();
+        syncRuntime.meta.lastResult = "error";
+        syncRuntime.meta.lastError = getSyncErrorMessage(error);
+        saveSyncMeta();
+        renderSyncStatus();
+        parserPreview.textContent = `공유 기록 불러오기 실패: ${syncRuntime.meta.lastError}`;
+        return;
+      }
+    }
+    triggerSync({ reason: roomChanged ? "config-room-change" : "config-save", urgent: true });
   }
 }
 
@@ -4245,12 +4281,13 @@ async function pushRemoteEnvelopeToGitHubGist(gistId, envelope) {
   }
 }
 
-function applyRemoteEnvelope(remoteEnvelope) {
+function applyRemoteEnvelope(remoteEnvelope, options = {}) {
+  const mergeLocal = options.mergeLocal !== false;
   const remoteTransactions = Array.isArray(remoteEnvelope?.data?.transactions)
     ? remoteEnvelope.data.transactions.map(normalizeTransaction).filter(Boolean)
     : [];
-  const nextTransactions = mergeTransactionsForSync(state.transactions, remoteTransactions);
-  const addedFromLocal = Math.max(0, nextTransactions.length - remoteTransactions.length);
+  const nextTransactions = mergeLocal ? mergeTransactionsForSync(state.transactions, remoteTransactions) : remoteTransactions;
+  const addedFromLocal = mergeLocal ? Math.max(0, nextTransactions.length - remoteTransactions.length) : 0;
   const nextSettings = normalizeSettings(remoteEnvelope?.data?.settings);
   const nextFriendsHidden = Boolean(remoteEnvelope?.data?.friendsHidden);
 
@@ -4267,8 +4304,11 @@ function applyRemoteEnvelope(remoteEnvelope) {
   }
 
   // If remote data looked older/incomplete, keep local transactions and re-push merged copy.
-  syncRuntime.meta.lastLocalUpdatedAt =
-    addedFromLocal > 0 ? Date.now() : Number(remoteEnvelope.updatedAt || Date.now());
+  syncRuntime.meta.lastLocalUpdatedAt = !mergeLocal
+    ? Number(remoteEnvelope.updatedAt || Date.now())
+    : addedFromLocal > 0
+      ? Date.now()
+      : Number(remoteEnvelope.updatedAt || Date.now());
   saveSyncMeta();
   syncSetupForm();
   applyFriendLayerVisibility();

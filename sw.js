@@ -1,4 +1,4 @@
-const CACHE_NAME = "mongle-ledger-cache-v63";
+const CACHE_NAME = "mongle-ledger-cache-v64";
 const ASSETS = [
   "./",
   "./index.html",
