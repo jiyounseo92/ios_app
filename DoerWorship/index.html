@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1a44c5" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="assets/brand/icon-1.png" type="image/png" />
+    <link rel="stylesheet" href="styles.css?v=20260309-15" />
+    <title>DOER Worship</title>
+  </head>
+  <body>
+    <div id="startup-overlay" class="startup-overlay" aria-live="polite">
+      <button id="startup-touch" class="startup-touch" type="button" aria-label="다음 시작 화면 보기">
+        <div id="startup-slide" class="startup-slide"></div>
+        <p id="startup-instruction" class="startup-instruction" aria-hidden="true"></p>
+      </button>
+    </div>
+
+    <div id="app" class="app" hidden>
+      <div id="sync-status" class="sync-status" data-mode="local">로컬 모드</div>
+      <main class="pages" id="pages">
+        <section class="page about-page" data-page="about" hidden>
+          <div class="about-image-wrap">
+            <img src="assets/logo/about-main.png?v=20260309-15" alt="DOER Worship ABOUT" />
+          </div>
+        </section>
+
+        <section class="page active" data-page="home">
+          <div class="page-title-row title-with-action">
+            <h2>이번 주 예배</h2>
+            <button id="open-service-editor" class="ghost-btn" type="button">입력/수정</button>
+          </div>
+
+          <article class="panel date-switch">
+            <div class="date-main-row">
+              <h3 class="date-heading">예배 날짜</h3>
+              <input id="home-service-date" type="date" readonly aria-readonly="true" />
+            </div>
+            <p id="home-practice-info" class="practice-note"></p>
+          </article>
+
+          <article id="home-verse-panel" class="panel verse-panel verse-openable" role="button" tabindex="0" aria-label="주제 말씀 성경에서 보기">
+            <h3>주제 말씀</h3>
+            <div id="home-verse" class="text-content"></div>
+          </article>
+
+          <article class="panel meditation-panel">
+            <h3>묵상</h3>
+            <div id="home-meditation"></div>
+          </article>
+
+          <article class="panel song-panel">
+            <h3>곡 리스트</h3>
+            <div id="home-song-list" class="song-list"></div>
+          </article>
+
+          <article class="panel playlist-panel">
+            <h3>이번주 플레이리스트</h3>
+            <div id="home-playlist"></div>
+          </article>
+
+          <article class="panel sheet-packet-panel">
+            <div class="panel-head-row">
+              <h3>이번주 악보</h3>
+              <button id="generate-weekly-pdf" class="primary-btn" type="button">악보 다운로드</button>
+            </div>
+            <ul id="weekly-sheet-status" class="status-list"></ul>
+          </article>
+        </section>
+
+        <section class="page" data-page="calendar" hidden>
+          <div class="page-title-row">
+            <h2>우리의 예배 기록</h2>
+          </div>
+
+          <article class="panel calendar-panel">
+            <div class="calendar-head">
+              <button id="calendar-prev" type="button" class="ghost-btn">이전</button>
+              <h3 id="calendar-month-label"></h3>
+              <button id="calendar-next" type="button" class="ghost-btn">다음</button>
+            </div>
+            <div id="calendar-weekdays" class="calendar-weekdays"></div>
+            <div id="calendar-grid" class="calendar-grid"></div>
+            <div class="calendar-legend">
+              <span class="calendar-legend-item"><i class="calendar-legend-dot worship"></i>예배</span>
+              <span class="calendar-legend-item"><i class="calendar-legend-dot practice"></i>연습</span>
+              <span class="calendar-legend-item"><i class="calendar-legend-dot both"></i>예배+연습</span>
+            </div>
+          </article>
+
+          <article class="panel" id="calendar-detail-panel">
+            <div id="calendar-detail"></div>
+          </article>
+        </section>
+
+        <section class="page" data-page="helper" hidden>
+          <div class="page-title-row">
+            <h2>찬양 기록</h2>
+            <p class="page-sub">곡/키/템포 및 과거 예배 송리스트 검색</p>
+          </div>
+
+          <article class="panel helper-filter-panel">
+            <div class="filter-field helper-query-field">
+              <label for="helper-query">곡 검색</label>
+              <input id="helper-query" type="text" placeholder="예: 주님의 임재 앞에서" />
+            </div>
+
+            <div class="filter-field">
+              <label>정렬</label>
+              <div class="helper-view-tabs">
+                <button class="ghost-btn is-active" type="button" data-helper-view="date">날짜별</button>
+                <button class="ghost-btn" type="button" data-helper-view="name">이름순</button>
+                <button class="ghost-btn" type="button" data-helper-view="key">키별</button>
+                <button class="ghost-btn" type="button" data-helper-view="tempo">템포순</button>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div id="helper-results" class="helper-results"></div>
+          </article>
+        </section>
+
+        <section class="page" data-page="sheet" hidden>
+          <div class="page-title-row">
+            <h2>악보 기록</h2>
+            <p class="page-sub">업로드/검색/미리보기/다운로드</p>
+          </div>
+
+          <article class="panel sheet-library-panel">
+            <div class="panel-head-row sheet-library-head">
+              <h3>악보 라이브러리</h3>
+              <input id="sheet-search" type="text" placeholder="제목/키 검색" />
+            </div>
+            <div id="sheet-library" class="sheet-library"></div>
+          </article>
+
+          <article class="panel sheet-upload-panel">
+            <h3>악보 업로드</h3>
+            <div class="sheet-upload-mode">
+              <button id="sheet-mode-single" class="ghost-btn is-active" type="button" data-sheet-mode="single" aria-pressed="true">
+                개별 악보 업로드
+              </button>
+              <button id="sheet-mode-merged" class="ghost-btn" type="button" data-sheet-mode="merged" aria-pressed="false">
+                합쳐진 악보 업로드
+              </button>
+            </div>
+
+            <div id="sheet-op-status" class="sheet-op-status" hidden></div>
+
+            <form id="sheet-single-form" class="stack-form">
+              <div id="sheet-single-dropzone" class="sheet-dropzone" role="button" tabindex="0" aria-label="개별 악보 파일 선택">
+                <p class="sheet-dropzone-title">개별 악보 PDF/PNG/JPG 업로드</p>
+                <p class="sheet-dropzone-sub">파일을 드래그하거나 클릭해서 선택</p>
+                <p id="sheet-single-file-name" class="sheet-dropzone-file">선택된 파일 없음</p>
+                <input id="sheet-single-file" type="file" accept="application/pdf,image/png,image/jpeg" />
+              </div>
+
+              <div class="panel-head-row sheet-action-row">
+                <button id="load-single-preview" class="ghost-btn" type="button">미리보기 불러오기</button>
+                <button id="clear-single-preview" class="ghost-btn" type="button">초기화</button>
+              </div>
+
+              <div id="single-preview-wrap" class="merged-preview-wrap" hidden>
+                <iframe id="single-preview-frame" title="개별 악보 미리보기"></iframe>
+              </div>
+
+              <div class="sheet-compact-grid">
+                <div class="sheet-field">
+                  <label for="sheet-single-title">곡 제목</label>
+                  <input id="sheet-single-title" type="text" placeholder="예: 예수 아름다우신" required />
+                </div>
+                <div class="sheet-field sheet-key-field">
+                  <label for="sheet-single-key">키(선택)</label>
+                  <input id="sheet-single-key" type="text" placeholder="예: G, A, F#m" />
+                </div>
+              </div>
+
+              <p id="sheet-single-duplicate" class="duplicate-hint"></p>
+              <div id="sheet-single-duplicate-list" class="duplicate-match-list"></div>
+
+              <button class="primary-btn" type="submit">개별 악보 저장</button>
+            </form>
+
+            <form id="sheet-merged-form" class="stack-form" hidden>
+              <div id="sheet-merged-dropzone" class="sheet-dropzone" role="button" tabindex="0" aria-label="합쳐진 악보 파일 선택">
+                <p class="sheet-dropzone-title">합쳐진 악보 PDF/PNG/JPG 업로드</p>
+                <p class="sheet-dropzone-sub">파일을 드래그하거나 클릭해서 선택</p>
+                <p id="sheet-merged-file-name" class="sheet-dropzone-file">선택된 파일 없음</p>
+                <input id="sheet-merged-file" type="file" accept="application/pdf,image/png,image/jpeg" />
+              </div>
+
+              <div class="panel-head-row sheet-action-row">
+                <button id="load-merged-preview" class="ghost-btn" type="button">미리보기 불러오기</button>
+                <button id="reset-merged-upload" class="ghost-btn" type="button">초기화</button>
+              </div>
+
+              <div id="merged-preview-wrap" class="merged-preview-wrap" hidden>
+                <iframe id="merged-preview-frame" title="합쳐진 악보 미리보기"></iframe>
+              </div>
+
+              <div id="merged-page-tools" class="panel-head-row sheet-action-row sheet-action-row-divider" hidden>
+                <h4>페이지 선택</h4>
+                <div class="sheet-inline-actions">
+                  <button id="merged-select-all" class="ghost-btn" type="button">전체 선택</button>
+                  <button id="merged-clear-selection" class="ghost-btn" type="button">선택 해제</button>
+                </div>
+              </div>
+
+              <div id="merged-page-grid" class="merged-page-grid"></div>
+              <p id="merged-selected-summary" class="muted">선택된 페이지 없음</p>
+
+              <div class="merged-song-editor">
+                <div class="sheet-compact-grid">
+                  <div class="sheet-field">
+                    <label for="merged-song-title">선택 페이지의 곡 제목</label>
+                    <input id="merged-song-title" type="text" placeholder="예: 그 이름 아름답도다" />
+                  </div>
+                  <div class="sheet-field sheet-key-field">
+                    <label for="merged-song-key">선택 페이지의 키(선택)</label>
+                    <input id="merged-song-key" type="text" placeholder="예: A" />
+                  </div>
+                </div>
+                <p id="merged-duplicate-hint" class="duplicate-hint"></p>
+                <div id="merged-duplicate-list" class="duplicate-match-list"></div>
+                <button id="add-merged-segment" class="primary-btn" type="button">선택 페이지를 곡으로 추가</button>
+              </div>
+
+              <div>
+                <h4>저장 대기 목록</h4>
+                <div id="merged-draft-list" class="merged-draft-list"></div>
+              </div>
+
+              <button id="save-merged-segments" class="primary-btn" type="submit">목록 전체 저장</button>
+            </form>
+          </article>
+        </section>
+
+        <section class="page" data-page="rotation" hidden>
+          <div class="page-title-row">
+            <h2>로테이션</h2>
+          </div>
+
+          <article class="panel">
+            <div class="calendar-head">
+              <button id="rotation-prev" type="button" class="ghost-btn">이전 달</button>
+              <h3 id="rotation-month-label"></h3>
+              <button id="rotation-next" type="button" class="ghost-btn">다음 달</button>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head-row rotation-table-head">
+              <h3>월간 로테이션</h3>
+              <div class="rotation-head-actions">
+                <button id="add-rotation-column" class="ghost-btn compact-btn" type="button" hidden>+ 날짜 추가</button>
+                <button id="toggle-rotation-edit" class="ghost-btn compact-btn" type="button">입력/수정</button>
+              </div>
+            </div>
+            <div id="rotation-list" class="rotation-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head-row">
+              <h3>불가능 일정</h3>
+              <button id="open-unavailability-editor" class="ghost-btn" type="button">일정 입력</button>
+            </div>
+            <div id="rotation-unavailability" class="chips"></div>
+          </article>
+        </section>
+      </main>
+
+      <footer class="app-footer">
+        <img src="assets/logo/full-logo.png" alt="DOER Worship 풀 로고" />
+      </footer>
+
+      <div class="fab-nav">
+        <button id="fab-toggle" class="fab-toggle" type="button" aria-expanded="false" aria-label="페이지 메뉴">
+          <img id="fab-icon" src="assets/brand/icon-1.png" alt="메뉴" />
+        </button>
+
+        <nav id="fab-menu" class="fab-menu" hidden>
+          <button class="fab-item" type="button" data-go-page="about">ABOUT</button>
+          <button class="fab-item" type="button" data-go-page="home">이번 주 예배</button>
+          <button class="fab-item" type="button" data-go-page="calendar">우리의 예배 기록</button>
+          <button class="fab-item" type="button" data-go-page="helper">찬양 기록</button>
+          <button class="fab-item" type="button" data-go-page="sheet">악보 기록</button>
+          <button class="fab-item" type="button" data-go-page="rotation">로테이션</button>
+        </nav>
+      </div>
+    </div>
+
+    <dialog id="service-editor-dialog" class="editor-dialog">
+      <div class="editor-dialog-head">
+        <h3>송리스트 입력/수정</h3>
+        <button id="service-editor-close" type="button" class="ghost-btn">닫기</button>
+      </div>
+      <form id="service-form" class="stack-form">
+        <div class="service-schedule-row">
+          <div class="service-schedule-field">
+            <label for="service-date">예배 날짜</label>
+            <input id="service-date" type="date" required />
+          </div>
+
+          <div class="service-schedule-field">
+            <label for="service-practice-date">연습 날짜</label>
+            <input id="service-practice-date" type="date" />
+          </div>
+
+          <div class="service-schedule-field">
+            <label for="service-practice-day">요일</label>
+            <input id="service-practice-day" type="text" placeholder="자동 계산" readonly />
+          </div>
+
+          <div class="service-schedule-field">
+            <label for="service-practice-time">연습 시간</label>
+            <input id="service-practice-time" type="text" placeholder="예: 오후 7:30" />
+          </div>
+        </div>
+
+        <label for="service-verse">주제 말씀</label>
+        <div class="verse-auto-row">
+          <input id="service-verse-ref" type="text" placeholder="예: 시편 90:12, 에베소서 5:15-16" />
+          <button id="auto-fill-verse" class="ghost-btn" type="button">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="label">우리말성경(두란노) 불러오기</span>
+          </button>
+        </div>
+        <textarea id="service-verse" rows="6"></textarea>
+
+        <label for="service-meditation">묵상</label>
+        <div class="meditation-editor-wrap">
+          <div id="meditation-toolbar" class="meditation-toolbar" role="toolbar" aria-label="묵상 서식">
+            <button class="ghost-btn compact-btn" type="button" data-meditation-cmd="bold"><strong>B</strong></button>
+          </div>
+          <div
+            id="service-meditation-editor"
+            class="rich-editor"
+            contenteditable="true"
+            role="textbox"
+            aria-label="묵상 입력"
+            aria-multiline="true"
+          ></div>
+        </div>
+        <textarea id="service-meditation" rows="3" hidden aria-hidden="true"></textarea>
+
+        <label for="service-playlist">이번주 플레이리스트 링크</label>
+        <input id="service-playlist" type="url" placeholder="https://" />
+
+        <div class="panel-head-row">
+          <h4>곡 목록</h4>
+          <button id="add-song-row" class="ghost-btn" type="button">곡 추가</button>
+        </div>
+        <div id="song-editor-list" class="song-editor-list"></div>
+
+        <div class="panel-head-row service-packet-row">
+          <button id="build-weekly-packet" class="ghost-btn" type="button">악보 합쳐서 이번주 악보 만들기</button>
+          <p id="service-packet-status" class="muted"></p>
+        </div>
+
+        <button class="primary-btn" type="submit">저장</button>
+      </form>
+    </dialog>
+
+    <dialog id="unavailability-dialog" class="editor-dialog">
+      <div class="editor-dialog-head">
+        <h3>불가능 일정 입력</h3>
+        <button id="unavailability-close" type="button" class="ghost-btn">닫기</button>
+      </div>
+      <form id="unavailability-form" class="stack-form inline-unavailable">
+        <input id="unavailable-id" type="hidden" />
+        <input id="unavailable-name" type="text" placeholder="이름" required />
+        <select id="unavailable-role" required>
+          <option value="">파트 선택</option>
+          <option value="인도">인도</option>
+          <option value="메인건반">메인건반</option>
+          <option value="세컨건반">세컨건반</option>
+          <option value="드럼">드럼</option>
+          <option value="베이스">베이스</option>
+          <option value="일렉기타">일렉기타</option>
+          <option value="어쿠스틱기타">어쿠스틱기타</option>
+          <option value="여자싱어">여자싱어</option>
+          <option value="남자싱어">남자싱어</option>
+          <option value="음향">음향</option>
+          <option value="자막">자막</option>
+          <option value="카메라">카메라</option>
+        </select>
+        <input id="unavailable-start" type="date" required />
+        <input id="unavailable-end" type="date" required />
+        <button id="unavailability-submit" class="primary-btn" type="submit">등록</button>
+      </form>
+    </dialog>
+
+    <dialog id="rotation-add-dialog" class="editor-dialog">
+      <div class="editor-dialog-head">
+        <h3>예배 날짜 추가</h3>
+        <button id="rotation-add-close" type="button" class="ghost-btn">닫기</button>
+      </div>
+      <form id="rotation-add-form" class="stack-form rotation-add-form">
+        <label for="rotation-add-date">추가할 날짜</label>
+        <input id="rotation-add-date" type="date" required />
+        <button class="primary-btn" type="submit">추가</button>
+      </form>
+    </dialog>
+
+    <dialog id="bible-viewer-dialog" class="editor-dialog bible-viewer-dialog">
+      <div class="editor-dialog-head">
+        <h3 id="bible-viewer-title">성경 보기</h3>
+        <button id="bible-viewer-close" type="button" class="ghost-btn">닫기</button>
+      </div>
+      <div class="stack-form">
+        <div class="bible-viewer-nav">
+          <button id="bible-prev-chapter" class="ghost-btn compact-btn" type="button">이전 장</button>
+          <div id="bible-viewer-chapter-label" class="bible-viewer-chapter-label"></div>
+          <button id="bible-next-chapter" class="ghost-btn compact-btn" type="button">다음 장</button>
+        </div>
+        <div id="bible-viewer-ref-list" class="bible-viewer-ref-list"></div>
+        <div id="bible-viewer-content" class="bible-viewer-content"></div>
+      </div>
+    </dialog>
+
+    <dialog id="pdf-preview-dialog" class="pdf-preview-dialog">
+      <div class="pdf-preview-head">
+        <h3 id="pdf-preview-title">악보 미리보기</h3>
+        <button id="pdf-preview-close" type="button" class="ghost-btn">닫기</button>
+      </div>
+      <iframe id="pdf-preview-frame" title="악보 미리보기"></iframe>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="config.js"></script>
+    <script src="lib/pdf-lib.min.js"></script>
+    <script src="app.js?v=20260309-15"></script>
+  </body>
+</html>

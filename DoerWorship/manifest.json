@@ -1,0 +1,22 @@
+{
+  "name": "DOER Worship",
+  "short_name": "DOER",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1a44c5",
+  "theme_color": "#1a44c5",
+  "icons": [
+    {
+      "src": "assets/brand/icon-1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/brand/icon-2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
