@@ -607,6 +607,19 @@ function bindEvents() {
 
   els.rotationList.addEventListener("input", onRotationInlineInput);
   els.rotationList.addEventListener("change", onRotationInlineInput);
+  els.rotationList.addEventListener("click", (event) => {
+    const removeButton = event.target.closest("button[data-rotation-remove-date]");
+    if (!removeButton) {
+      return;
+    }
+    const date = String(removeButton.dataset.rotationRemoveDate || "");
+    if (!date) {
+      return;
+    }
+    if (window.confirm(`${formatDate(date)} 컬럼을 삭제할까요?`)) {
+      removeRotationDateAndSync(date);
+    }
+  });
 
   els.calendarGrid.addEventListener("click", (event) => {
     const button = event.target.closest("button[data-date]");
@@ -919,7 +932,7 @@ function bindEvents() {
       return;
     }
 
-    const control = event.target.closest("input[data-field], select[data-field]");
+    const control = event.target.closest("input[data-field], select[data-field], textarea[data-field]");
     if (!control) {
       return;
     }
@@ -1139,7 +1152,6 @@ function bindEvents() {
 
     state.weeklyPacketMessage = "";
     renderAll();
-    setPage("home");
     closeDialog(els.serviceEditorDialog);
   });
 
@@ -3450,7 +3462,23 @@ function renderRotation() {
   }
 
   const headerCells = columns
-    .map((column) => `<th>${formatShortDate(column.date)}</th>`)
+    .map((column) => {
+      const canRemove = state.rotationEditMode && isRemovableRotationDate(column.date);
+      return `
+        <th>
+          <div class="rotation-date-head">
+            <span>${escapeHtml(formatShortDate(column.date))}</span>
+            ${
+              canRemove
+                ? `<button class="ghost-btn compact-btn rotation-date-remove" type="button" data-rotation-remove-date="${escapeHtmlAttr(
+                    column.date
+                  )}" aria-label="${escapeHtmlAttr(formatDate(column.date))} 삭제">삭제</button>`
+                : ""
+            }
+          </div>
+        </th>
+      `;
+    })
     .join("");
 
   const addHeaderCell = state.rotationEditMode
@@ -3602,6 +3630,31 @@ function getRotationColumnsForMonth(month) {
       date,
       rotation: aggregateRotationForDate(date),
     }));
+}
+
+function isRemovableRotationDate(date) {
+  const parsed = parseIsoDate(date);
+  if (!parsed) {
+    return false;
+  }
+  return parsed.getDay() !== 0;
+}
+
+function removeRotationDateAndSync(date) {
+  if (!date || !isRemovableRotationDate(date)) {
+    return;
+  }
+
+  state.data.rotations = state.data.rotations.filter((rotation) => rotation.worshipDate !== date);
+  if (state.data.services && state.data.services[date]) {
+    delete state.data.services[date];
+  }
+  if (state.data.selectedServiceDate === date) {
+    state.data.selectedServiceDate = "";
+  }
+  sortRotations();
+  saveData();
+  renderAll();
 }
 
 function aggregateRotationForDate(date) {
@@ -3774,7 +3827,9 @@ function renderSongEditorRows() {
           <input data-field="key" type="text" placeholder="키" value="${escapeHtmlAttr(song.key)}" />
           <input data-field="tempo" type="text" placeholder="템포" value="${escapeHtmlAttr(song.tempo)}" />
           <input data-field="referenceUrl" type="url" placeholder="유튜브 링크" value="${escapeHtmlAttr(song.referenceUrl)}" />
-          <input data-field="comment" class="song-comment-input" type="text" placeholder="송폼/코멘트" value="${escapeHtmlAttr(song.comment || "")}" />
+          <textarea data-field="comment" class="song-comment-input" placeholder="송폼/코멘트">${escapeHtml(
+            song.comment || ""
+          )}</textarea>
         </div>
         <div class="song-sheet-grid">
           <input class="song-sheet-search-input" data-song-sheet-search="${index}" type="text" placeholder="악보 검색하기" value="${escapeHtmlAttr(
@@ -7341,11 +7396,30 @@ async function ensureDriveAccessToken() {
       client_id: state.config.drive.clientId,
       scope: state.config.drive.scope || DEFAULT_RUNTIME_CONFIG.drive.scope,
       callback: () => {},
+      error_callback: () => {},
     });
   }
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(
+        new Error(
+          `Drive 로그인 시간이 초과되었습니다. Google Cloud > OAuth 클라이언트의 승인된 JavaScript 원본에 현재 주소(${window.location.origin})를 추가하세요.`
+        )
+      );
+    }, 25000);
+
     state.cloud.driveTokenClient.callback = (tokenResponse) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      window.clearTimeout(timeoutId);
       if (tokenResponse && tokenResponse.access_token) {
         state.cloud.driveAccessToken = tokenResponse.access_token;
         const expiresIn = Number(tokenResponse.expires_in || 3600);
@@ -7354,6 +7428,21 @@ async function ensureDriveAccessToken() {
         return;
       }
       reject(new Error((tokenResponse && tokenResponse.error) || "Drive 인증 실패"));
+    };
+    state.cloud.driveTokenClient.error_callback = (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      window.clearTimeout(timeoutId);
+      const detail = error && typeof error === "object" ? String(error.type || error.message || "") : "";
+      reject(
+        new Error(
+          detail
+            ? `Drive 인증 실패: ${detail}`
+            : `Drive 인증 실패. Google Cloud > OAuth 클라이언트의 승인된 JavaScript 원본에 ${window.location.origin} 이 등록되어 있는지 확인하세요.`
+        )
+      );
     };
 
     state.cloud.driveTokenClient.requestAccessToken({
