@@ -371,6 +371,11 @@ button {
   align-items: center;
 }
 
+.meditation-toolbar .ghost-btn.is-active {
+  background: var(--doer-blue);
+  color: #ffffff;
+}
+
 .rich-editor {
   min-height: 210px;
   max-height: 360px;

@@ -1047,15 +1047,27 @@ function bindEvents() {
     els.serviceMeditationEditor.addEventListener("input", () => {
       els.serviceMeditation.value = els.serviceMeditationEditor.innerHTML;
       saveMeditationSelection();
+      updateMeditationToolbarState();
     });
     els.serviceMeditationEditor.addEventListener("keyup", () => {
       saveMeditationSelection();
+      updateMeditationToolbarState();
     });
     els.serviceMeditationEditor.addEventListener("mouseup", () => {
       saveMeditationSelection();
+      updateMeditationToolbarState();
+    });
+    els.serviceMeditationEditor.addEventListener("click", () => {
+      saveMeditationSelection();
+      updateMeditationToolbarState();
+    });
+    els.serviceMeditationEditor.addEventListener("focus", () => {
+      saveMeditationSelection();
+      updateMeditationToolbarState();
     });
     els.serviceMeditationEditor.addEventListener("blur", () => {
       saveMeditationSelection();
+      updateMeditationToolbarState();
     });
   }
 
@@ -1079,6 +1091,11 @@ function bindEvents() {
       applyMeditationCommand(cmd);
     });
   }
+
+  document.addEventListener("selectionchange", () => {
+    saveMeditationSelection();
+    updateMeditationToolbarState();
+  });
 
   els.serviceForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1555,6 +1572,47 @@ function saveMeditationSelection() {
   state.meditationSelectionRange = range.cloneRange();
 }
 
+function getMeditationToolbarButtons() {
+  if (!els.meditationToolbar) {
+    return [];
+  }
+  return Array.from(els.meditationToolbar.querySelectorAll("button[data-meditation-cmd]"));
+}
+
+function isSelectionInsideMeditationEditor() {
+  if (!els.serviceMeditationEditor || !window.getSelection) {
+    return false;
+  }
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount < 1) {
+    return false;
+  }
+  const range = selection.getRangeAt(0);
+  return Boolean(range && els.serviceMeditationEditor.contains(range.commonAncestorContainer));
+}
+
+function updateMeditationToolbarState() {
+  const buttons = getMeditationToolbarButtons();
+  if (!buttons.length) {
+    return;
+  }
+  const inEditor = isSelectionInsideMeditationEditor();
+  let boldActive = false;
+  if (inEditor) {
+    try {
+      boldActive = Boolean(document.queryCommandState("bold"));
+    } catch {
+      boldActive = false;
+    }
+  }
+  buttons.forEach((button) => {
+    const cmd = String(button.dataset.meditationCmd || "");
+    const active = cmd === "bold" && boldActive;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
 function restoreMeditationSelection() {
   if (!els.serviceMeditationEditor) {
     return false;
@@ -1589,15 +1647,23 @@ function applyMeditationCommand(command) {
     return;
   }
 
-  restoreMeditationSelection();
+  const hasLiveSelection = isSelectionInsideMeditationEditor();
+  if (!hasLiveSelection) {
+    restoreMeditationSelection();
+  } else {
+    els.serviceMeditationEditor.focus();
+  }
+
   try {
     document.execCommand("styleWithCSS", false, false);
     document.execCommand("bold", false, null);
   } catch {
     // no-op
   }
+
   saveMeditationSelection();
   els.serviceMeditation.value = els.serviceMeditationEditor.innerHTML;
+  updateMeditationToolbarState();
 }
 
 function getMeditationForSave() {
@@ -1620,6 +1686,7 @@ function setMeditationEditorValue(value) {
     els.serviceMeditation.value = html;
   }
   state.meditationSelectionRange = null;
+  updateMeditationToolbarState();
 }
 
 function normalizeMeditationHtml(value) {
