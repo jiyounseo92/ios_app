@@ -596,6 +596,8 @@ const profileCombinedAddEl = document.getElementById("profile-combined-add");
 const profileLedgerRowTemplateEl = document.getElementById("profile-ledger-row-template");
 const profileCombinedRowTemplateEl = document.getElementById("profile-combined-row-template");
 const profileAccountsNameEl = document.getElementById("profile-accounts-name");
+const settingsAccountsSaveEl = document.getElementById("settings-accounts-save");
+const keywordSettingsSaveEl = document.getElementById("keyword-settings-save");
 const saveToastEl = document.getElementById("save-toast");
 const saveToastTextEl = document.getElementById("save-toast-text");
 
@@ -1861,6 +1863,23 @@ function handleProfileFormSubmit(event) {
   showSaveToast("저장완료!");
 }
 
+function handleSettingsAccountsSaveClick() {
+  saveSettings();
+  renderAccountsManagerGrid(settingsAccountsManageGridEl, { onlyWhenAccountsScope: false });
+  if (parserPreview) {
+    parserPreview.textContent = "계정별 통장/카드 관리를 저장했어요.";
+  }
+  showSaveToast("저장완료!");
+}
+
+function handleKeywordSettingsSaveClick() {
+  saveSettings();
+  if (parserPreview) {
+    parserPreview.textContent = "키워드 관리를 저장했어요.";
+  }
+  showSaveToast("저장완료!");
+}
+
 init();
 
 function init() {
@@ -2091,6 +2110,12 @@ function init() {
   }
   if (profileCombinedRowsEl) {
     profileCombinedRowsEl.addEventListener("click", handleProfileCombinedRemove);
+  }
+  if (settingsAccountsSaveEl) {
+    settingsAccountsSaveEl.addEventListener("click", handleSettingsAccountsSaveClick);
+  }
+  if (keywordSettingsSaveEl) {
+    keywordSettingsSaveEl.addEventListener("click", handleKeywordSettingsSaveClick);
   }
 
   if (flowerKeywordForm) {
@@ -4799,7 +4824,7 @@ function renderCategoryList(categoryEntries) {
 function renderCategoryDetail(expenseTransactions) {
   if (!state.selectedCategory) {
     detailTitleEl.textContent = "카테고리 상세";
-    detailSummaryEl.textContent = "카테고리를 선택하면 소비 패턴을 보여줘요.";
+    detailSummaryEl.textContent = "카테고리를 선택하면\n\n소비 패턴을 보여줘요.";
     if (detailMerchantDateEl) {
       detailMerchantDateEl.textContent = "";
     }

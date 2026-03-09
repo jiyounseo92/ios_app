@@ -441,8 +441,12 @@ body.view-home-mode .home-friend-dock {
   z-index: 3;
   text-align: center;
   margin: 44px auto 22px;
-  width: 50%;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  white-space: nowrap;
+  word-break: keep-all;
   font-size: clamp(2.8rem, 8.4vw, 5rem);
+  letter-spacing: -0.02em;
   line-height: 1.05;
   color: #ffffff;
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
@@ -1228,8 +1232,16 @@ button:active {
 
 .category-manage-head {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+  align-items: center;
+}
+
+.category-name-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 details summary {
@@ -1613,6 +1625,14 @@ details[open] {
 .single-line-title {
   white-space: nowrap;
   font-size: clamp(0.95rem, 3.8vw, 1.1rem);
+}
+
+#detail-title {
+  white-space: nowrap;
+}
+
+#detail-summary {
+  white-space: pre-line;
 }
 
 .accounts-manager-panel {
@@ -2388,7 +2408,7 @@ details[open] {
   }
 
   .category-manage-head {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .records-header {
@@ -2521,6 +2541,14 @@ details[open] {
     letter-spacing: -0.01em;
   }
 
+  .category-manage-head {
+    grid-template-columns: 1fr;
+  }
+
+  .category-name-actions {
+    justify-content: flex-end;
+  }
+
   .stats-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
@@ -2575,7 +2603,9 @@ details[open] {
   }
 
   .home-title {
-    width: 50%;
+    width: max-content;
+    max-width: calc(100% - 12px);
+    white-space: nowrap;
     font-size: clamp(2rem, 9vw, 3rem);
     margin-top: 11vh;
     margin-bottom: 10vh;
@@ -3209,16 +3239,24 @@ body.onboarding-active {
 }
 
 .profile-config-block .onboard-add-btn {
-  margin-top: 8px;
+  margin-top: 0;
   border: 0;
   background: #346d4a;
   color: #fff;
+  white-space: nowrap;
 }
 
-.profile-save-row {
+.profile-actions-row {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-actions-row-single {
+  justify-content: flex-end;
 }
 
 .profile-save-btn {
@@ -3231,6 +3269,7 @@ body.onboarding-active {
   padding: 8px 12px;
   cursor: pointer;
   transition: transform 0.16s ease, opacity 0.16s ease;
+  white-space: nowrap;
 }
 
 .profile-save-btn:active {
@@ -3240,6 +3279,12 @@ body.onboarding-active {
 .profile-tabname-block label {
   display: grid;
   gap: 6px;
+}
+
+.settings-save-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .profile-ledger-row {
@@ -3383,6 +3428,17 @@ body.onboarding-active {
 
   .profile-ledger-row {
     grid-template-columns: 1fr;
+  }
+
+  .profile-actions-row {
+    justify-content: space-between;
+    flex-wrap: nowrap;
+  }
+
+  .profile-config-block .onboard-add-btn,
+  .profile-save-btn {
+    font-size: 0.8rem;
+    padding: 7px 9px;
   }
 
   .onboarding-setup {
