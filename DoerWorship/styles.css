@@ -93,7 +93,7 @@ th,
 }
 
 .startup-slide {
-  width: min(560px, 46vw);
+  width: min(745px, 61vw);
   max-width: 100%;
   opacity: 1;
   transform: translateY(0);
@@ -107,7 +107,7 @@ th,
 
 .startup-image {
   width: 100%;
-  max-height: 48vh;
+  max-height: 64vh;
   max-width: 100%;
   display: block;
   margin: 0 auto;
@@ -1782,11 +1782,11 @@ button {
   }
 
   .startup-slide {
-    width: min(420px, 62vw);
+    width: min(560px, 82vw);
   }
 
   .startup-image {
-    max-height: 36vh;
+    max-height: 48vh;
   }
 
   .about-image-wrap img {
