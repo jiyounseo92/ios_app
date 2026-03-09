@@ -160,7 +160,7 @@
     </script>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/icon-192.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=71" />
+    <link rel="stylesheet" href="styles.css?v=72" />
     <title>포켓 가계부</title>
   </head>
   <body>
@@ -348,16 +348,27 @@
             <h3 class="title-with-char"><img src="assets/chars/blue.svg" class="mini-char" alt="" /><span>계정 이름</span></h3>
             <div id="profile-ledger-rows" class="onboard-entry-list"></div>
             <button type="button" id="profile-ledger-add" class="onboard-add-btn">+ 계정 추가</button>
+            <div class="profile-save-row">
+              <button type="button" class="profile-save-btn" data-profile-save-section="records">계정 저장</button>
+            </div>
           </article>
           <article class="profile-config-block">
             <h3 class="title-with-char"><img src="assets/chars/pink.svg" class="mini-char" alt="" /><span>합산 기록</span></h3>
             <div id="profile-combined-rows" class="onboard-entry-list"></div>
             <button type="button" id="profile-combined-add" class="onboard-add-btn">+ 합산 기록 추가</button>
+            <div class="profile-save-row">
+              <button type="button" class="profile-save-btn" data-profile-save-section="combined">합산 기록 저장</button>
+            </div>
           </article>
-          <label>
-            <span class="title-with-char label-title-with-char"><img src="assets/chars/green.svg" class="mini-char" alt="" /><span>통장/카드 탭 이름</span></span>
-            <input id="profile-accounts-name" type="text" />
-          </label>
+          <article class="profile-config-block profile-tabname-block">
+            <label>
+              <span class="title-with-char label-title-with-char"><img src="assets/chars/green.svg" class="mini-char" alt="" /><span>통장/카드 탭 이름</span></span>
+              <input id="profile-accounts-name" type="text" />
+            </label>
+            <div class="profile-save-row">
+              <button type="button" class="profile-save-btn" data-profile-save-section="accounts">통장/카드 이름 저장</button>
+            </div>
+          </article>
           <article class="onboarding-block-template" hidden>
             <div id="profile-ledger-row-template" class="profile-ledger-row">
               <input type="text" data-profile-ledger-name placeholder="계정 이름" />
@@ -369,7 +380,6 @@
               <button type="button" data-profile-combined-remove aria-label="합산 기록 삭제">삭제</button>
             </div>
           </article>
-          <button type="submit">유형 저장</button>
         </form>
       </section>
 
@@ -542,9 +552,12 @@
           <p class="hint">같은 공유 비밀번호를 쓰면 같은 기록으로 자동 연결돼요.</p>
         </div>
         <form id="sync-form" class="setup-form" autocomplete="off">
-          <label>공유 비밀번호
-            <input id="sync-room-code" type="text" placeholder="예: blossom2026" />
-          </label>
+          <div class="sync-room-row">
+            <label class="sync-room-input">공유 비밀번호
+              <input id="sync-room-code" type="text" placeholder="예: blossom2026" />
+            </label>
+            <button type="submit" class="scope-btn sync-save-btn">공유 비밀번호 저장</button>
+          </div>
           <label class="sync-advanced" hidden>Sync URL
             <input id="sync-endpoint" type="text" placeholder="https://<project-ref>.supabase.co" />
           </label>
@@ -559,7 +572,6 @@
             <input id="sync-enabled" type="checkbox" />
           </label>
           <div class="sync-actions">
-            <button type="submit">공유 비밀번호 저장</button>
             <button id="sync-copy-link" type="button" class="scope-btn">초대 링크 복사</button>
             <button id="sync-now" type="button" class="scope-btn">동기화</button>
           </div>
@@ -733,6 +745,10 @@
         </div>
       </section>
     </main>
-    <script src="app.js?v=83"></script>
+    <div id="save-toast" class="save-toast" hidden aria-live="polite" role="status">
+      <img src="assets/chars/yellow.svg" alt="" />
+      <span id="save-toast-text">저장완료!</span>
+    </div>
+    <script src="app.js?v=84"></script>
   </body>
 </html>

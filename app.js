@@ -596,6 +596,8 @@ const profileCombinedAddEl = document.getElementById("profile-combined-add");
 const profileLedgerRowTemplateEl = document.getElementById("profile-ledger-row-template");
 const profileCombinedRowTemplateEl = document.getElementById("profile-combined-row-template");
 const profileAccountsNameEl = document.getElementById("profile-accounts-name");
+const saveToastEl = document.getElementById("save-toast");
+const saveToastTextEl = document.getElementById("save-toast-text");
 
 const ruleForm = document.getElementById("rule-form");
 const ruleKeywordInput = document.getElementById("rule-keyword");
@@ -612,6 +614,7 @@ let onboardingTransitioning = false;
 let onboardingLastAdvanceAt = 0;
 const ONBOARDING_TRANSITION_MS = 780;
 const ONBOARDING_ADVANCE_GUARD_MS = 180;
+let saveToastTimer = 0;
 
 function populateOnboardingSetupRows() {
   const profile = getUserProfile();
@@ -1758,35 +1761,104 @@ function handleOnboardingAccountManagerDone() {
   }
 }
 
-function handleProfileFormSubmit(event) {
-  event.preventDefault();
-  const recordRows = collectProfileLedgerRows();
-  const records = recordRows.length
-    ? recordRows.map((row) => row.name)
-    : [DEFAULT_USER_PROFILE.personalLedgerName];
-  const personalName = cleanText(records[0], DEFAULT_USER_PROFILE.personalLedgerName);
-  const flowerName = cleanText(records[1], DEFAULT_USER_PROFILE.flowerLedgerName);
-  const combinedConfigs = collectProfileCombinedConfigs();
-  const combinedEnabled = combinedConfigs.length > 0;
-  const combinedName = cleanText(combinedConfigs[0]?.name, DEFAULT_USER_PROFILE.combinedLedgerName);
+function showSaveToast(message = "저장완료!") {
+  if (!saveToastEl || !saveToastTextEl) {
+    return;
+  }
+  saveToastTextEl.textContent = cleanText(message, "저장완료!");
+  saveToastEl.hidden = false;
+  saveToastEl.classList.remove("show");
+  window.requestAnimationFrame(() => saveToastEl.classList.add("show"));
+  if (saveToastTimer) {
+    window.clearTimeout(saveToastTimer);
+  }
+  saveToastTimer = window.setTimeout(() => {
+    saveToastEl.classList.remove("show");
+    window.setTimeout(() => {
+      if (!saveToastEl.classList.contains("show")) {
+        saveToastEl.hidden = true;
+      }
+    }, 240);
+    saveToastTimer = 0;
+  }, 1250);
+}
+
+function saveProfileSection(section = "all") {
+  const prev = normalizeUserProfile(state.settings.userProfile || {});
   const nextProfile = {
+    ...prev,
     onboardingDone: true,
-    records,
-    combinedConfigs,
-    personalLedgerName: personalName,
-    flowerLedgerName: flowerName,
-    accountsTabName: cleanText(profileAccountsNameEl?.value, DEFAULT_USER_PROFILE.accountsTabName),
-    combinedEnabled,
-    combinedLedgerName: combinedName,
   };
+
+  if (section === "all" || section === "records") {
+    const recordRows = collectProfileLedgerRows();
+    const records = recordRows.length
+      ? recordRows.map((row) => row.name)
+      : [DEFAULT_USER_PROFILE.personalLedgerName];
+    const personalName = cleanText(records[0], DEFAULT_USER_PROFILE.personalLedgerName);
+    const flowerName = cleanText(records[1], DEFAULT_USER_PROFILE.flowerLedgerName);
+    nextProfile.records = records;
+    nextProfile.personalLedgerName = personalName;
+    nextProfile.flowerLedgerName = flowerName;
+
+    const nameTokens = uniqueStrings(
+      `${flowerName} ${flowerName.replace(/[^a-zA-Z0-9가-힣\s]/g, " ")}`.split(/\s+/)
+    ).filter((token) => token.length >= 2);
+    if (nameTokens.length) {
+      state.settings.flowerKeywords = uniqueStrings([...(state.settings.flowerKeywords || []), ...nameTokens]);
+    }
+  }
+
+  if (section === "all" || section === "combined") {
+    const combinedConfigs = collectProfileCombinedConfigs();
+    nextProfile.combinedConfigs = combinedConfigs;
+    nextProfile.combinedEnabled = combinedConfigs.length > 0;
+    nextProfile.combinedLedgerName = cleanText(combinedConfigs[0]?.name, DEFAULT_USER_PROFILE.combinedLedgerName);
+  }
+
+  if (section === "all" || section === "accounts") {
+    nextProfile.accountsTabName = cleanText(profileAccountsNameEl?.value, DEFAULT_USER_PROFILE.accountsTabName);
+  }
+
   state.settings.userProfile = normalizeUserProfile(nextProfile);
   saveSettings();
   applyDynamicLabels();
   applyFriendShortcuts();
   renderQuickKindPicker();
   renderQuickAccountToggle();
+  renderQuickCardOptions();
+  renderQuickCategoryToggle();
   render();
-  parserPreview.textContent = "계정 설정을 저장했어요.";
+
+  return true;
+}
+
+function handleProfileSectionSave(event) {
+  const button = event.target.closest("button[data-profile-save-section]");
+  if (!button) {
+    return;
+  }
+  const section = cleanText(button.dataset.profileSaveSection, "all");
+  const labels = {
+    records: "계정 저장완료!",
+    combined: "합산 기록 저장완료!",
+    accounts: "통장/카드 이름 저장완료!",
+    all: "저장완료!",
+  };
+  saveProfileSection(section);
+  if (parserPreview) {
+    parserPreview.textContent = labels[section] || "저장완료!";
+  }
+  showSaveToast("저장완료!");
+}
+
+function handleProfileFormSubmit(event) {
+  event.preventDefault();
+  saveProfileSection("all");
+  if (parserPreview) {
+    parserPreview.textContent = "계정 설정을 저장했어요.";
+  }
+  showSaveToast("저장완료!");
 }
 
 init();
@@ -1996,6 +2068,7 @@ function init() {
   }
   if (profileFormEl) {
     profileFormEl.addEventListener("submit", handleProfileFormSubmit);
+    profileFormEl.addEventListener("click", handleProfileSectionSave);
   }
   if (profileLedgerAddEl) {
     profileLedgerAddEl.addEventListener("click", () => {
