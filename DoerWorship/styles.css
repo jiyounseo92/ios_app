@@ -458,7 +458,9 @@ button {
 }
 
 .home-date-main-row {
-  grid-template-columns: 92px minmax(106px, 170px) minmax(0, 1fr);
+  grid-template-columns: 74px minmax(0, 124px);
+  column-gap: 8px;
+  row-gap: 6px;
 }
 
 .date-heading {
@@ -474,15 +476,26 @@ button {
 }
 
 #home-service-date {
-  max-width: 170px;
-  width: 100%;
+  max-width: 124px;
+  width: 124px;
+  min-width: 0;
+  padding: 8px 9px;
+  font-size: 0.86rem;
+  line-height: 1.2;
 }
 
 #home-practice-info {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  grid-column: 1 / -1;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
   min-width: 0;
+  line-height: 1.32;
+}
+
+.practice-label {
+  font-family: "GmarketSansBold", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 700;
 }
 
 .sheet-packet-actions {
@@ -1212,12 +1225,12 @@ button {
 
 .rotation-month-table th,
 .rotation-month-table td {
-  padding: 8px 10px;
+  padding: 6px 6px;
   text-align: center;
   border-right: 1px solid #e5e9f2;
   border-bottom: 1px solid #e5e9f2;
   vertical-align: top;
-  min-width: 108px;
+  min-width: 84px;
 }
 
 .rotation-month-table tr:last-child td {
@@ -1230,7 +1243,7 @@ button {
 
 .rotation-month-table th:first-child,
 .rotation-month-table td:first-child {
-  min-width: 120px;
+  min-width: 92px;
   position: sticky;
   left: 0;
   z-index: 1;
@@ -1259,7 +1272,7 @@ button {
 .rotation-month-table .month-sub-row td {
   background: #f8f9fc;
   color: var(--text-soft);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .rotation-month-table.is-editing .month-sub-row td {
@@ -1268,13 +1281,13 @@ button {
 
 .rotation-month-table.is-editing th,
 .rotation-month-table.is-editing td {
-  min-width: 40px;
-  padding: 6px 6px;
+  min-width: 30px;
+  padding: 4px 4px;
 }
 
 .rotation-month-table.is-editing th:first-child,
 .rotation-month-table.is-editing td:first-child {
-  min-width: 52px;
+  min-width: 46px;
 }
 
 .rotation-month-table tbody tr.group-start th,
@@ -1285,11 +1298,12 @@ button {
 .rotation-role-cell {
   font-family: "GmarketSansBold", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: var(--text-soft);
-  font-size: 0.83rem;
+  font-size: 0.78rem;
 }
 
 .rotation-cell {
   text-align: left;
+  line-height: 1.16;
 }
 
 .rotation-cell-empty {
@@ -1298,17 +1312,17 @@ button {
 
 .rotation-edit-input {
   width: 100%;
-  min-width: 36px;
+  min-width: 28px;
   border: 0;
   border-radius: 10px;
   background: #f2f5fc;
-  padding: 6px 7px;
-  font-size: 0.82rem;
+  padding: 4px 5px;
+  font-size: 0.76rem;
 }
 
 .rotation-add-col-cell {
-  min-width: 52px !important;
-  width: 52px;
+  min-width: 42px !important;
+  width: 42px;
 }
 
 .rotation-add-form {
@@ -1411,12 +1425,12 @@ button {
 
 .name-token {
   display: inline-block;
-  margin: 0 3px 3px 0;
-  padding: 3px 6px;
+  margin: 0 1px 1px 0;
+  padding: 2px 4px;
   border-radius: 999px;
   background: #ffffff;
-  font-size: 0.82rem;
-  line-height: 1.2;
+  font-size: 0.76rem;
+  line-height: 1.08;
 }
 
 .name-token.unavailable {
@@ -1749,6 +1763,42 @@ button {
   background: #f4f6fb;
 }
 
+#home-packet-preview-frame[hidden] {
+  display: none !important;
+}
+
+.home-packet-preview-pages {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  background: #f4f6fb;
+  max-height: min(76vh, 760px);
+  overflow: auto;
+}
+
+.home-packet-preview-page {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #dce4f4;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.home-packet-preview-page-label {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-soft);
+}
+
+.home-packet-preview-page canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .song-row-preview-frame {
   width: 100%;
   height: min(44vh, 460px);
@@ -1916,6 +1966,20 @@ button {
 
   .home-date-main-row {
     grid-template-columns: 128px minmax(0, 200px) minmax(0, 1fr);
+  }
+
+  #home-service-date {
+    max-width: 164px;
+    width: 164px;
+    font-size: 0.9rem;
+  }
+
+  #home-practice-info {
+    grid-column: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.45;
   }
 
   .helper-filter-panel {

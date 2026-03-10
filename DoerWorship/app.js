@@ -282,6 +282,7 @@ const state = {
   serviceInlinePreviewSongId: "",
   serviceInlinePreviewTitle: "",
   homePacketPreviewUrl: "",
+  homePacketPreviewRenderToken: 0,
   meditationSelectionRange: null,
   servicePacketMessage: "",
   weeklyPacketMessage: "",
@@ -381,6 +382,7 @@ function cacheElements() {
   els.homePacketPreviewWrap = document.getElementById("home-packet-preview-wrap");
   els.homePacketPreviewFrame = document.getElementById("home-packet-preview-frame");
   els.homePacketPreviewClose = document.getElementById("home-packet-preview-close");
+  els.homePacketPreviewPages = document.getElementById("home-packet-preview-pages");
 
   els.pages = Array.from(document.querySelectorAll(".page"));
   els.appFooter = document.querySelector(".app-footer");
@@ -599,7 +601,8 @@ function bindEvents() {
   }
 
   els.homeServiceDate.addEventListener("change", () => {
-    els.homeServiceDate.value = getHomeWeeklySundayDate();
+    const iso = getHomeWeeklySundayDate();
+    els.homeServiceDate.value = iso ? formatBankDate(iso) : "";
   });
 
   if (els.homeVersePanel) {
@@ -1748,17 +1751,18 @@ function renderAll() {
 }
 
 function renderHeader() {
-  els.homeServiceDate.value = getHomeWeeklySundayDate();
+  const homeDate = getHomeWeeklySundayDate();
+  els.homeServiceDate.value = homeDate ? formatBankDate(homeDate) : "";
 }
 
 function renderHome() {
   const homeDate = getHomeWeeklySundayDate();
   const service = homeDate ? state.data.services[homeDate] || null : null;
-  els.homeServiceDate.value = homeDate || "";
+  els.homeServiceDate.value = homeDate ? formatBankDate(homeDate) : "";
 
   if (!service) {
     closeHomePacketPreview();
-    els.homePracticeInfo.textContent = "연습 일정 없음";
+    els.homePracticeInfo.innerHTML = '<span class="practice-label">연습:</span> 일정 없음';
     els.homeVerse.innerHTML = renderVerseMarkup("");
     els.homeMeditation.innerHTML = renderMeditationMarkup("");
     els.homeSongList.innerHTML = `<p class="empty-note">아직 등록된 곡 리스트가 없습니다.</p>`;
@@ -1767,7 +1771,7 @@ function renderHome() {
     return;
   }
 
-  els.homePracticeInfo.textContent = formatHomePracticeSummary(service);
+  els.homePracticeInfo.innerHTML = formatHomePracticeSummaryMarkup(service);
   els.homeVerse.innerHTML = renderVerseMarkup(service.verse || "");
   els.homeMeditation.innerHTML = renderMeditationMarkup(service.meditation || "");
   els.homePlaylist.innerHTML = renderPlaylistMarkup(service.playlistUrl);
@@ -4166,7 +4170,7 @@ function splitNames(value) {
 
 function uniqueJoin(values) {
   const unique = Array.from(new Set(values.filter(Boolean)));
-  return unique.join(", ");
+  return unique.join(",");
 }
 
 function renderSongEditorRows() {
@@ -5410,24 +5414,143 @@ async function openServiceInlinePreview(sheet, titleText = "", songId = "") {
 }
 
 function closeHomePacketPreview() {
+  state.homePacketPreviewRenderToken += 1;
   if (state.homePacketPreviewUrl) {
     URL.revokeObjectURL(state.homePacketPreviewUrl);
     state.homePacketPreviewUrl = "";
   }
   if (els.homePacketPreviewFrame) {
     els.homePacketPreviewFrame.src = "";
+    els.homePacketPreviewFrame.hidden = false;
+  }
+  if (els.homePacketPreviewPages) {
+    els.homePacketPreviewPages.hidden = true;
+    els.homePacketPreviewPages.innerHTML = "";
   }
   if (els.homePacketPreviewWrap) {
     els.homePacketPreviewWrap.hidden = true;
   }
 }
 
-function openHomePacketPreview(blob) {
-  closeHomePacketPreview();
-  state.homePacketPreviewUrl = URL.createObjectURL(blob);
-  if (els.homePacketPreviewFrame) {
-    els.homePacketPreviewFrame.src = state.homePacketPreviewUrl;
+function shouldRenderHomePacketAsPages() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
   }
+  return window.matchMedia("(max-width: 900px)").matches;
+}
+
+async function renderHomePacketPreviewPages(blob) {
+  if (!els.homePacketPreviewPages) {
+    return false;
+  }
+
+  const token = state.homePacketPreviewRenderToken + 1;
+  state.homePacketPreviewRenderToken = token;
+
+  els.homePacketPreviewPages.hidden = false;
+  els.homePacketPreviewPages.innerHTML = '<p class="muted">미리보기를 불러오는 중...</p>';
+
+  try {
+    const pdfjs = await getPdfJsLib();
+    if (!pdfjs || typeof pdfjs.getDocument !== "function") {
+      els.homePacketPreviewPages.innerHTML = '<p class="empty-note">미리보기를 불러오지 못했습니다.</p>';
+      return false;
+    }
+
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    if (state.homePacketPreviewRenderToken !== token) {
+      return false;
+    }
+
+    const loadingTask = pdfjs.getDocument({ data: bytes });
+    const pdf = await loadingTask.promise;
+    if (state.homePacketPreviewRenderToken !== token) {
+      if (typeof loadingTask.destroy === "function") {
+        loadingTask.destroy();
+      }
+      return false;
+    }
+
+    els.homePacketPreviewPages.innerHTML = "";
+    const containerWidth = Math.max(
+      260,
+      (els.homePacketPreviewPages.clientWidth || els.homePacketPreviewWrap?.clientWidth || 360) - 18
+    );
+
+    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+      if (state.homePacketPreviewRenderToken !== token) {
+        break;
+      }
+      const page = await pdf.getPage(pageNo);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const fitScale = containerWidth / Math.max(1, baseViewport.width);
+      const viewport = page.getViewport({ scale: fitScale });
+      const pageWrap = document.createElement("div");
+      pageWrap.className = "home-packet-preview-page";
+      const canvas = document.createElement("canvas");
+      const outputScale = Math.min(2, window.devicePixelRatio || 1);
+      canvas.width = Math.ceil(viewport.width * outputScale);
+      canvas.height = Math.ceil(viewport.height * outputScale);
+      canvas.style.width = `${Math.round(viewport.width)}px`;
+      canvas.style.height = `${Math.round(viewport.height)}px`;
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) {
+        continue;
+      }
+      ctx.setTransform(outputScale, 0, 0, outputScale, 0, 0);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const caption = document.createElement("p");
+      caption.className = "home-packet-preview-page-label";
+      caption.textContent = `페이지 ${pageNo}`;
+      pageWrap.appendChild(caption);
+      pageWrap.appendChild(canvas);
+      els.homePacketPreviewPages.appendChild(pageWrap);
+    }
+
+    if (!els.homePacketPreviewPages.childElementCount) {
+      els.homePacketPreviewPages.innerHTML = '<p class="empty-note">미리보기 페이지가 없습니다.</p>';
+    }
+    if (typeof loadingTask.destroy === "function") {
+      loadingTask.destroy();
+    }
+    return true;
+  } catch {
+    if (state.homePacketPreviewRenderToken === token) {
+      els.homePacketPreviewPages.innerHTML = '<p class="empty-note">미리보기를 불러오지 못했습니다.</p>';
+    }
+    return false;
+  }
+}
+
+async function openHomePacketPreview(blob) {
+  closeHomePacketPreview();
+  if (els.homePacketPreviewWrap) {
+    els.homePacketPreviewWrap.hidden = false;
+  }
+
+  let renderedAsPages = false;
+  if (shouldRenderHomePacketAsPages()) {
+    renderedAsPages = await renderHomePacketPreviewPages(blob);
+  }
+
+  if (renderedAsPages) {
+    if (els.homePacketPreviewFrame) {
+      els.homePacketPreviewFrame.hidden = true;
+      els.homePacketPreviewFrame.src = "";
+    }
+  } else {
+    state.homePacketPreviewUrl = URL.createObjectURL(blob);
+    if (els.homePacketPreviewFrame) {
+      els.homePacketPreviewFrame.hidden = false;
+      els.homePacketPreviewFrame.src = state.homePacketPreviewUrl;
+    }
+    if (els.homePacketPreviewPages) {
+      els.homePacketPreviewPages.hidden = true;
+      els.homePacketPreviewPages.innerHTML = "";
+    }
+  }
+
   if (els.homePacketPreviewWrap) {
     els.homePacketPreviewWrap.hidden = false;
   }
@@ -5511,7 +5634,7 @@ async function previewWeeklyPacket() {
     renderHome();
     return;
   }
-  openHomePacketPreview(blob);
+  await openHomePacketPreview(blob);
 }
 
 async function downloadCalendarPacketByDate(date) {
@@ -8302,7 +8425,23 @@ function formatHomePracticeSummary(service) {
   const dateText = service && service.practiceDate ? formatDate(service.practiceDate) : "";
   const timeText = service && service.practiceTime ? String(service.practiceTime || "").trim() : "";
   const chunks = [dateText && `연습: ${dateText}`, timeText && `시간: ${timeText}`].filter(Boolean);
-  return chunks.length ? chunks.join(" / ") : "연습 일정 없음";
+  return chunks.length ? chunks.join("\n") : "연습 일정 없음";
+}
+
+function formatHomePracticeSummaryMarkup(service) {
+  const dateText = service && service.practiceDate ? formatDate(service.practiceDate) : "";
+  const timeText = service && service.practiceTime ? String(service.practiceTime || "").trim() : "";
+  const lines = [];
+  if (dateText) {
+    lines.push(`<span><span class="practice-label">연습:</span> ${escapeHtml(dateText)}</span>`);
+  }
+  if (timeText) {
+    lines.push(`<span><span class="practice-label">시간:</span> ${escapeHtml(timeText)}</span>`);
+  }
+  if (!lines.length) {
+    return '<span><span class="practice-label">연습:</span> 일정 없음</span>';
+  }
+  return lines.join("<br>");
 }
 
 function renderPlaylistMarkup(url) {

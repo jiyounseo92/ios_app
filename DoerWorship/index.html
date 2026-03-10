@@ -50,7 +50,7 @@
           <article class="panel date-switch">
             <div class="date-main-row home-date-main-row">
               <h3 class="date-heading">예배 날짜</h3>
-              <input id="home-service-date" type="date" readonly aria-readonly="true" />
+              <input id="home-service-date" type="text" readonly aria-readonly="true" />
               <p id="home-practice-info" class="practice-note"></p>
             </div>
           </article>
@@ -93,6 +93,7 @@
                 <button id="home-packet-preview-close" class="ghost-btn compact-btn" type="button">미리보기 닫기</button>
               </div>
               <iframe id="home-packet-preview-frame" title="이번주 악보 미리보기"></iframe>
+              <div id="home-packet-preview-pages" class="home-packet-preview-pages" hidden></div>
             </div>
           </article>
         </section>
