@@ -19,9 +19,9 @@
     <meta name="twitter:description" content="DOER Worship App" />
     <meta name="twitter:image" content="https://jiyounseo92.github.io/ios_app/DoerWorship/assets/startup/always-start.png" />
     <link rel="manifest" href="manifest.json" />
-    <link rel="icon" href="assets/brand/icon-door-white-192.png?v=20260309-16" type="image/png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/brand/apple-touch-door-white-180.png?v=20260309-16" />
-    <link rel="stylesheet" href="styles.css?v=20260309-15" />
+    <link rel="icon" href="assets/brand/icon-door-white-192.png?v=20260310-01" type="image/png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/brand/apple-touch-door-white-180.png?v=20260310-01" />
+    <link rel="stylesheet" href="styles.css?v=20260310-01" />
     <title>DOER Worship App</title>
   </head>
   <body>
@@ -37,7 +37,7 @@
       <main class="pages" id="pages">
         <section class="page about-page" data-page="about" hidden>
           <div class="about-image-wrap">
-            <img src="assets/logo/about-main.png?v=20260309-15" alt="DOER Worship ABOUT" />
+            <img src="assets/logo/about-main.png?v=20260310-01" alt="DOER Worship ABOUT" />
           </div>
         </section>
 
@@ -48,15 +48,18 @@
           </div>
 
           <article class="panel date-switch">
-            <div class="date-main-row">
+            <div class="date-main-row home-date-main-row">
               <h3 class="date-heading">예배 날짜</h3>
               <input id="home-service-date" type="date" readonly aria-readonly="true" />
+              <p id="home-practice-info" class="practice-note"></p>
             </div>
-            <p id="home-practice-info" class="practice-note"></p>
           </article>
 
           <article id="home-verse-panel" class="panel verse-panel verse-openable" role="button" tabindex="0" aria-label="주제 말씀 성경에서 보기">
-            <h3>주제 말씀</h3>
+            <div class="panel-head-row panel-head-tight">
+              <h3>주제 말씀</h3>
+              <button id="home-verse-open-link" type="button" class="tiny-link-btn">클릭해서 전체 말씀보기</button>
+            </div>
             <div id="home-verse" class="text-content"></div>
           </article>
 
@@ -78,9 +81,19 @@
           <article class="panel sheet-packet-panel">
             <div class="panel-head-row">
               <h3>이번주 악보</h3>
-              <button id="generate-weekly-pdf" class="primary-btn" type="button">악보 다운로드</button>
+              <div class="sheet-packet-actions">
+                <button id="preview-weekly-pdf" class="ghost-btn" type="button">미리보기</button>
+                <button id="generate-weekly-pdf" class="primary-btn" type="button">악보 다운로드</button>
+              </div>
             </div>
             <ul id="weekly-sheet-status" class="status-list"></ul>
+            <div id="home-packet-preview-wrap" class="inline-preview-wrap" hidden>
+              <div class="inline-preview-head">
+                <span>이번주 악보 미리보기</span>
+                <button id="home-packet-preview-close" class="ghost-btn compact-btn" type="button">미리보기 닫기</button>
+              </div>
+              <iframe id="home-packet-preview-frame" title="이번주 악보 미리보기"></iframe>
+            </div>
           </article>
         </section>
 
@@ -161,15 +174,14 @@
                 합쳐진 악보 업로드
               </button>
             </div>
-
             <div id="sheet-op-status" class="sheet-op-status" hidden></div>
 
             <form id="sheet-single-form" class="stack-form">
               <div id="sheet-single-dropzone" class="sheet-dropzone" role="button" tabindex="0" aria-label="개별 악보 파일 선택">
                 <p class="sheet-dropzone-title">개별 악보 PDF/PNG/JPG 업로드</p>
-                <p class="sheet-dropzone-sub">파일을 드래그하거나 클릭해서 선택</p>
+                <p class="sheet-dropzone-sub">파일을 여러 개 드래그하거나 클릭해서 선택 (선택 파일 합치기 지원)</p>
                 <p id="sheet-single-file-name" class="sheet-dropzone-file">선택된 파일 없음</p>
-                <input id="sheet-single-file" type="file" accept="application/pdf,image/png,image/jpeg" />
+                <input id="sheet-single-file" type="file" accept="application/pdf,image/png,image/jpeg" multiple />
               </div>
 
               <div class="panel-head-row sheet-action-row">
@@ -195,7 +207,10 @@
               <p id="sheet-single-duplicate" class="duplicate-hint"></p>
               <div id="sheet-single-duplicate-list" class="duplicate-match-list"></div>
 
-              <button class="primary-btn" type="submit">개별 악보 저장</button>
+              <div class="sheet-submit-row">
+                <button class="primary-btn" type="submit">개별 악보 저장</button>
+                <div id="sheet-status-slot-single" class="sheet-status-slot"></div>
+              </div>
             </form>
 
             <form id="sheet-merged-form" class="stack-form" hidden>
@@ -247,7 +262,10 @@
                 <div id="merged-draft-list" class="merged-draft-list"></div>
               </div>
 
-              <button id="save-merged-segments" class="primary-btn" type="submit">목록 전체 저장</button>
+              <div class="sheet-submit-row">
+                <button id="save-merged-segments" class="primary-btn" type="submit">목록 전체 저장</button>
+                <div id="sheet-status-slot-merged" class="sheet-status-slot"></div>
+              </div>
             </form>
           </article>
         </section>
@@ -309,7 +327,10 @@
     <dialog id="service-editor-dialog" class="editor-dialog">
       <div class="editor-dialog-head">
         <h3>송리스트 입력/수정</h3>
-        <button id="service-editor-close" type="button" class="ghost-btn">닫기</button>
+        <div class="editor-dialog-actions">
+          <button id="service-editor-save-top" type="submit" class="primary-btn compact-btn editor-head-btn" form="service-form">저장</button>
+          <button id="service-editor-close" type="button" class="ghost-btn compact-btn editor-head-btn">닫기</button>
+        </div>
       </div>
       <form id="service-form" class="stack-form">
         <div class="service-schedule-row">
@@ -372,6 +393,13 @@
         <div class="panel-head-row service-packet-row">
           <button id="build-weekly-packet" class="ghost-btn" type="button">악보 합쳐서 이번주 악보 만들기</button>
           <p id="service-packet-status" class="muted"></p>
+        </div>
+        <div id="service-inline-preview-wrap" class="inline-preview-wrap" hidden>
+          <div class="inline-preview-head">
+            <span id="service-inline-preview-title">악보 미리보기</span>
+            <button id="service-inline-preview-close" class="ghost-btn compact-btn" type="button">미리보기 닫기</button>
+          </div>
+          <iframe id="service-inline-preview-frame" title="악보 미리보기"></iframe>
         </div>
 
         <button class="primary-btn" type="submit">저장</button>
@@ -448,6 +476,6 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="config.js"></script>
     <script src="lib/pdf-lib.min.js"></script>
-    <script src="app.js?v=20260309-15"></script>
+    <script src="app.js?v=20260310-01"></script>
   </body>
 </html>

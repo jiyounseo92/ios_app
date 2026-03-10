@@ -227,6 +227,21 @@ h2 {
   flex-wrap: wrap;
 }
 
+.panel-head-tight {
+  margin-bottom: 2px;
+}
+
+.tiny-link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--doer-blue);
+  font-size: 0.74rem;
+  padding: 0;
+  text-decoration: none;
+  cursor: pointer;
+  opacity: 0.9;
+}
+
 h3 {
   margin: 0;
   font-size: 1rem;
@@ -393,8 +408,14 @@ button {
   background: var(--surface-soft);
   padding: 12px;
   outline: none;
-  line-height: 1.5;
+  line-height: 1.32;
   font-family: "GmarketSansLight", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.rich-editor p,
+.rich-editor div {
+  margin: 0;
+  line-height: 1.32;
 }
 
 .rich-editor:focus {
@@ -433,6 +454,11 @@ button {
 .date-main-row {
   display: grid;
   gap: 10px;
+  align-items: center;
+}
+
+.home-date-main-row {
+  grid-template-columns: 92px minmax(106px, 170px) minmax(0, 1fr);
 }
 
 .date-heading {
@@ -445,6 +471,25 @@ button {
   color: var(--text-soft);
   font-size: 0.86rem;
   white-space: pre-line;
+}
+
+#home-service-date {
+  max-width: 170px;
+  width: 100%;
+}
+
+#home-practice-info {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.sheet-packet-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .song-list {
@@ -518,6 +563,7 @@ button {
   color: #6c7385;
   font-size: 0.78rem;
   line-height: 1.35;
+  white-space: pre-wrap;
 }
 
 .song-card-actions {
@@ -722,6 +768,11 @@ button {
   flex-wrap: wrap;
 }
 
+#calendar-detail {
+  display: grid;
+  gap: 14px;
+}
+
 .helper-filter-panel {
   grid-template-columns: 1fr;
   gap: 10px;
@@ -908,7 +959,7 @@ button {
 }
 
 .sheet-op-status {
-  min-height: 40px;
+  min-height: 36px;
   border-radius: 12px;
   background: #eff4ff;
   color: var(--doer-blue);
@@ -917,6 +968,21 @@ button {
   gap: 8px;
   padding: 10px 12px;
   font-size: 0.86rem;
+}
+
+.sheet-submit-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.sheet-status-slot {
+  min-width: 0;
+}
+
+.sheet-submit-row #sheet-op-status {
+  width: 100%;
 }
 
 .sheet-op-status[data-busy="true"]::before {
@@ -1126,6 +1192,13 @@ button {
 .compact-btn {
   padding: 6px 10px;
   font-size: 0.74rem;
+}
+
+.editor-head-btn {
+  min-width: 78px;
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 0.82rem;
 }
 
 .rotation-month-table {
@@ -1384,6 +1457,35 @@ button {
   gap: 8px;
 }
 
+.song-editor-row.drag-over {
+  outline: 2px dashed rgba(26, 68, 197, 0.45);
+  outline-offset: 2px;
+}
+
+.song-editor-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.song-editor-top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.song-drag-handle {
+  cursor: grab;
+  user-select: none;
+  padding: 4px 8px;
+  min-height: 30px;
+}
+
+.song-drag-handle:active {
+  cursor: grabbing;
+}
+
 .song-editor-row.is-ready {
   background: #edf4ff;
   box-shadow: inset 0 0 0 1px #c7d8ff;
@@ -1399,7 +1501,7 @@ button {
   grid-column: 1 / -1;
   font-size: 0.82rem;
   padding: 9px 11px;
-  min-height: 72px;
+  min-height: 56px;
   resize: vertical;
   line-height: 1.45;
 }
@@ -1463,6 +1565,56 @@ button {
   align-items: center;
 }
 
+.song-sheet-grid .ghost-btn.compact-btn {
+  min-height: 30px;
+  padding: 6px 9px;
+  font-size: 0.76rem;
+}
+
+.song-sheet-grid .ghost-btn.compact-btn.is-active {
+  background: #e8f0ff;
+  box-shadow: inset 0 0 0 1px #9bb6f8;
+}
+
+.song-selected-sheet-list {
+  display: grid;
+  gap: 6px;
+}
+
+.song-selected-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  border: 1px solid #d9e2f4;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 7px 8px;
+  cursor: grab;
+}
+
+.song-selected-sheet-item.drag-over {
+  outline: 2px dashed rgba(26, 68, 197, 0.42);
+  outline-offset: 1px;
+}
+
+.song-selected-sheet-item.dragging {
+  opacity: 0.6;
+}
+
+.song-selected-sheet-title {
+  font-family: "GmarketSansBold", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text);
+}
+
+.song-sheet-item-drag {
+  color: var(--doer-blue);
+  font-size: 0.9rem;
+  line-height: 1;
+  user-select: none;
+}
+
 .song-sheet-grid select {
   min-width: 0;
 }
@@ -1482,6 +1634,28 @@ button {
 
 .song-sheet-search-results .muted.warn {
   color: #a13232;
+}
+
+.song-sheet-add-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--doer-blue);
+}
+
+.song-editor-row.is-sheet-add-mode {
+  background: #e9f1ff;
+  box-shadow: inset 0 0 0 1px #bdd0ff;
+}
+
+.song-editor-row.is-sheet-add-mode .song-sheet-search-input {
+  background: #dfe9ff;
+  box-shadow: 0 0 0 2px rgba(26, 68, 197, 0.22);
+}
+
+.song-editor-row.is-sheet-add-mode .song-sheet-search-results {
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  padding: 6px;
 }
 
 .sheet-merge-toggle {
@@ -1540,8 +1714,46 @@ button {
   justify-content: flex-end;
 }
 
+.song-remove-btn {
+  color: #b23535;
+}
+
 .song-sheet-upload-input {
   display: none;
+}
+
+.inline-preview-wrap {
+  border: 1px solid #dce4f4;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.inline-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #f5f8ff;
+  border-bottom: 1px solid #e1e8f8;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+}
+
+#service-inline-preview-frame,
+#home-packet-preview-frame {
+  width: 100%;
+  height: min(56vh, 580px);
+  border: 0;
+  background: #f4f6fb;
+}
+
+.song-row-preview-frame {
+  width: 100%;
+  height: min(44vh, 460px);
+  border: 0;
+  background: #f4f6fb;
 }
 
 .inline-three,
@@ -1646,6 +1858,12 @@ button {
   border-bottom: 1px solid #edf0f8;
 }
 
+.editor-dialog-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .editor-dialog .stack-form {
   padding: 14px 16px;
 }
@@ -1692,8 +1910,12 @@ button {
   }
 
   .date-main-row {
-    grid-template-columns: 170px minmax(0, 280px);
+    grid-template-columns: 140px minmax(0, 200px) minmax(0, 1fr);
     align-items: center;
+  }
+
+  .home-date-main-row {
+    grid-template-columns: 128px minmax(0, 200px) minmax(0, 1fr);
   }
 
   .helper-filter-panel {

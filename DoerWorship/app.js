@@ -41,7 +41,7 @@ const ROLE_NAMES = [
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 const WEEKDAY_KO_MON = ["월", "화", "수", "목", "금", "토", "일"];
 const HOME_TIMEZONE = "America/Los_Angeles";
-const APP_BUILD_ID = "20260309-15";
+const APP_BUILD_ID = "20260310-01";
 const BIBLE_CACHE_REV = "r8";
 const BIBLE_VERSION_ID = 4639;
 const BIBLE_VERSION_CODE = "WB";
@@ -273,7 +273,15 @@ const state = {
   serviceFormDriveHits: {},
   serviceFormDriveTimers: {},
   serviceFormDriveSeq: {},
+  serviceFormSheetAddMode: {},
+  serviceFormDragSongId: "",
+  serviceFormDragSheet: { songId: "", sheetId: "" },
   serviceFormWeeklyPacket: null,
+  serviceEditorOriginPage: "home",
+  serviceInlinePreviewUrl: "",
+  serviceInlinePreviewSongId: "",
+  serviceInlinePreviewTitle: "",
+  homePacketPreviewUrl: "",
   meditationSelectionRange: null,
   servicePacketMessage: "",
   weeklyPacketMessage: "",
@@ -296,6 +304,7 @@ const state = {
     mode: "single",
     singlePreviewUrl: "",
     singleDroppedFile: null,
+    singleDroppedFiles: [],
     mergedFile: null,
     mergedDroppedFile: null,
     mergedFileBytes: null,
@@ -363,11 +372,15 @@ function cacheElements() {
   els.homeServiceDate = document.getElementById("home-service-date");
   els.homePracticeInfo = document.getElementById("home-practice-info");
   els.homeVersePanel = document.getElementById("home-verse-panel");
+  els.homeVerseOpenLink = document.getElementById("home-verse-open-link");
   els.homeVerse = document.getElementById("home-verse");
   els.homeMeditation = document.getElementById("home-meditation");
   els.homeSongList = document.getElementById("home-song-list");
   els.homePlaylist = document.getElementById("home-playlist");
   els.weeklySheetStatus = document.getElementById("weekly-sheet-status");
+  els.homePacketPreviewWrap = document.getElementById("home-packet-preview-wrap");
+  els.homePacketPreviewFrame = document.getElementById("home-packet-preview-frame");
+  els.homePacketPreviewClose = document.getElementById("home-packet-preview-close");
 
   els.pages = Array.from(document.querySelectorAll(".page"));
   els.appFooter = document.querySelector(".app-footer");
@@ -394,6 +407,8 @@ function cacheElements() {
 
   els.sheetModeButtons = Array.from(document.querySelectorAll("[data-sheet-mode]"));
   els.sheetOpStatus = document.getElementById("sheet-op-status");
+  els.sheetStatusSlotSingle = document.getElementById("sheet-status-slot-single");
+  els.sheetStatusSlotMerged = document.getElementById("sheet-status-slot-merged");
 
   els.sheetSingleForm = document.getElementById("sheet-single-form");
   els.sheetSingleDropzone = document.getElementById("sheet-single-dropzone");
@@ -467,9 +482,15 @@ function cacheElements() {
   els.unavailabilitySubmit = document.getElementById("unavailability-submit");
 
   els.generateWeeklyPdf = document.getElementById("generate-weekly-pdf");
+  els.previewWeeklyPdf = document.getElementById("preview-weekly-pdf");
 
   els.serviceEditorDialog = document.getElementById("service-editor-dialog");
   els.serviceEditorClose = document.getElementById("service-editor-close");
+  els.serviceEditorSaveTop = document.getElementById("service-editor-save-top");
+  els.serviceInlinePreviewWrap = document.getElementById("service-inline-preview-wrap");
+  els.serviceInlinePreviewFrame = document.getElementById("service-inline-preview-frame");
+  els.serviceInlinePreviewTitle = document.getElementById("service-inline-preview-title");
+  els.serviceInlinePreviewClose = document.getElementById("service-inline-preview-close");
   els.unavailabilityDialog = document.getElementById("unavailability-dialog");
   els.unavailabilityClose = document.getElementById("unavailability-close");
   els.rotationAddDialog = document.getElementById("rotation-add-dialog");
@@ -510,8 +531,24 @@ function bindEvents() {
   });
 
   els.serviceEditorClose.addEventListener("click", () => {
+    closeServiceInlinePreview();
     closeDialog(els.serviceEditorDialog);
   });
+  if (els.serviceInlinePreviewClose) {
+    els.serviceInlinePreviewClose.addEventListener("click", () => {
+      closeServiceInlinePreview();
+    });
+  }
+  if (els.serviceEditorDialog) {
+    els.serviceEditorDialog.addEventListener("close", () => {
+      closeServiceInlinePreview();
+    });
+  }
+  if (els.homePacketPreviewClose) {
+    els.homePacketPreviewClose.addEventListener("click", () => {
+      closeHomePacketPreview();
+    });
+  }
 
   els.toggleRotationEdit.addEventListener("click", () => {
     state.rotationEditMode = !state.rotationEditMode;
@@ -574,6 +611,13 @@ function bindEvents() {
         event.preventDefault();
         openBibleViewerForDate(getHomeWeeklySundayDate());
       }
+    });
+  }
+  if (els.homeVerseOpenLink) {
+    els.homeVerseOpenLink.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openBibleViewerForDate(getHomeWeeklySundayDate());
     });
   }
 
@@ -646,6 +690,15 @@ function bindEvents() {
   });
 
   els.calendarDetail.addEventListener("click", (event) => {
+    const packetButton = event.target.closest("button[data-calendar-packet-download]");
+    if (packetButton) {
+      const date = String(packetButton.dataset.calendarPacketDownload || "");
+      if (date) {
+        void downloadCalendarPacketByDate(date);
+      }
+      return;
+    }
+
     const button = event.target.closest("button[data-calendar-edit-date]");
     if (button) {
       const date = String(button.dataset.calendarEditDate || "");
@@ -699,18 +752,25 @@ function bindEvents() {
   els.sheetSingleForm.addEventListener("submit", onSingleSheetUpload);
   els.sheetSingleFile.addEventListener("change", () => {
     state.sheetUpload.singleDroppedFile = null;
-    const file = els.sheetSingleFile.files && els.sheetSingleFile.files[0];
-    if (file && !isSheetUploadFile(file)) {
+    const files = Array.from(els.sheetSingleFile.files || []);
+    state.sheetUpload.singleDroppedFiles = files;
+    if (files.some((file) => !isSheetUploadFile(file))) {
       els.sheetSingleFile.value = "";
+      state.sheetUpload.singleDroppedFiles = [];
       setDropzoneFileName(els.sheetSingleFileName, null);
       setSheetOperationStatus("PDF, PNG, JPG 파일만 업로드할 수 있습니다.", false);
       return;
     }
-    setDropzoneFileName(els.sheetSingleFileName, file || null);
-    if (file) {
-      setSheetOperationStatus(`개별 악보 파일 선택: ${file.name}`, false);
+    setDropzoneFileName(els.sheetSingleFileName, files);
+    if (files.length) {
+      setSheetOperationStatus(
+        files.length > 1
+          ? `개별 악보 파일 ${files.length}개 선택 (저장 시 1개의 PDF로 합쳐집니다).`
+          : `개별 악보 파일 선택: ${files[0].name}`,
+        false
+      );
     }
-    void onSingleFileSelected(file || null);
+    void onSingleFileSelected(files);
   });
   els.loadSinglePreview.addEventListener("click", async () => {
     await loadSinglePreview();
@@ -720,12 +780,26 @@ function bindEvents() {
     setDuplicateHint(els.sheetSingleDuplicate, els.sheetSingleDuplicateList, null);
     setSheetOperationStatus("개별 업로드 파일을 초기화했습니다.", false);
   });
-  bindPdfDropzone(els.sheetSingleDropzone, els.sheetSingleFile, (file) => {
-    state.sheetUpload.singleDroppedFile = file;
-    setDropzoneFileName(els.sheetSingleFileName, file);
-    setSheetOperationStatus(`개별 악보 파일 선택: ${file.name}`, false);
-    void onSingleFileSelected(file);
-  });
+  bindPdfDropzone(
+    els.sheetSingleDropzone,
+    els.sheetSingleFile,
+    (files) => {
+      const picked = Array.isArray(files) ? files : files ? [files] : [];
+      state.sheetUpload.singleDroppedFile = picked[0] || null;
+      state.sheetUpload.singleDroppedFiles = picked;
+      setDropzoneFileName(els.sheetSingleFileName, picked);
+      if (picked.length) {
+        setSheetOperationStatus(
+          picked.length > 1
+            ? `개별 악보 파일 ${picked.length}개 선택 (저장 시 1개의 PDF로 합쳐집니다).`
+            : `개별 악보 파일 선택: ${picked[0].name}`,
+          false
+        );
+      }
+      void onSingleFileSelected(picked);
+    },
+    { multiple: true }
+  );
 
   [els.sheetSingleTitle, els.sheetSingleKey].forEach((input) => {
     input.addEventListener("input", () => {
@@ -875,6 +949,11 @@ function bindEvents() {
   els.generateWeeklyPdf.addEventListener("click", async () => {
     await downloadOrGenerateWeeklyPacket();
   });
+  if (els.previewWeeklyPdf) {
+    els.previewWeeklyPdf.addEventListener("click", async () => {
+      await previewWeeklyPacket();
+    });
+  }
 
   els.serviceDate.addEventListener("change", () => {
     const date = els.serviceDate.value;
@@ -911,6 +990,145 @@ function bindEvents() {
     state.serviceFormDriveHits[song.id] = { queryKey: "", items: [], loading: false, error: "" };
     state.serviceFormDriveSeq[song.id] = 0;
     renderSongEditorRows();
+  });
+
+  els.songEditorList.addEventListener("dragstart", (event) => {
+    const sheetItem = event.target.closest("[data-song-sheet-item]");
+    if (sheetItem) {
+      const row = sheetItem.closest(".song-editor-row");
+      const songId = String((row && row.dataset.songId) || "");
+      const sheetId = String(sheetItem.dataset.sheetId || "");
+      if (!songId || !sheetId) {
+        return;
+      }
+      state.serviceFormDragSheet = { songId, sheetId };
+      sheetItem.classList.add("dragging");
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", `${songId}:${sheetId}`);
+      }
+      return;
+    }
+
+    const handle = event.target.closest("[data-song-drag-handle]");
+    if (!handle) {
+      return;
+    }
+    const row = handle.closest(".song-editor-row");
+    if (!row) {
+      return;
+    }
+    const songId = String(row.dataset.songId || "");
+    if (!songId) {
+      return;
+    }
+    state.serviceFormDragSongId = songId;
+    row.classList.add("dragging");
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", songId);
+    }
+  });
+
+  els.songEditorList.addEventListener("dragover", (event) => {
+    if (state.serviceFormDragSheet && state.serviceFormDragSheet.sheetId) {
+      const targetList = event.target.closest("[data-song-selected-list]");
+      const targetItem = event.target.closest("[data-song-sheet-item]");
+      const row = targetList ? targetList.closest(".song-editor-row") : null;
+      const songId = String((row && row.dataset.songId) || "");
+      if (!targetList || !songId || songId !== state.serviceFormDragSheet.songId) {
+        return;
+      }
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      els.songEditorList.querySelectorAll(".song-selected-sheet-item.drag-over").forEach((node) => {
+        node.classList.remove("drag-over");
+      });
+      if (targetItem && String(targetItem.dataset.sheetId || "") !== state.serviceFormDragSheet.sheetId) {
+        targetItem.classList.add("drag-over");
+      }
+      return;
+    }
+
+    if (!state.serviceFormDragSongId) {
+      return;
+    }
+    const row = event.target.closest(".song-editor-row");
+    if (!row) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    els.songEditorList.querySelectorAll(".song-editor-row.drag-over").forEach((node) => {
+      node.classList.remove("drag-over");
+    });
+    row.classList.add("drag-over");
+  });
+
+  els.songEditorList.addEventListener("drop", (event) => {
+    if (state.serviceFormDragSheet && state.serviceFormDragSheet.sheetId) {
+      const targetList = event.target.closest("[data-song-selected-list]");
+      const row = targetList ? targetList.closest(".song-editor-row") : null;
+      const songId = String((row && row.dataset.songId) || "");
+      if (!targetList || !row || !songId || songId !== state.serviceFormDragSheet.songId) {
+        return;
+      }
+      event.preventDefault();
+      const index = Number(row.dataset.index);
+      if (Number.isNaN(index) || !state.serviceFormSongs[index]) {
+        return;
+      }
+
+      const song = state.serviceFormSongs[index];
+      const dragId = String(state.serviceFormDragSheet.sheetId || "");
+      const targetItem = event.target.closest("[data-song-sheet-item]");
+      const targetId = targetItem ? String(targetItem.dataset.sheetId || "") : "";
+      const current = getSongSheetIds(song).filter((id) => id !== dragId);
+      if (!current.length && dragId) {
+        setSongSheetIds(song, [dragId]);
+      } else if (dragId) {
+        if (targetId && current.includes(targetId)) {
+          const targetIdx = current.indexOf(targetId);
+          current.splice(targetIdx, 0, dragId);
+        } else {
+          current.push(dragId);
+        }
+        setSongSheetIds(song, current);
+      }
+      state.serviceFormDragSheet = { songId: "", sheetId: "" };
+      renderSongEditorRows();
+      return;
+    }
+
+    const targetRow = event.target.closest(".song-editor-row");
+    if (!targetRow || !state.serviceFormDragSongId) {
+      return;
+    }
+    event.preventDefault();
+    const targetSongId = String(targetRow.dataset.songId || "");
+    if (!targetSongId || targetSongId === state.serviceFormDragSongId) {
+      return;
+    }
+    const fromIndex = state.serviceFormSongs.findIndex((song) => song.id === state.serviceFormDragSongId);
+    const toIndex = state.serviceFormSongs.findIndex((song) => song.id === targetSongId);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
+      return;
+    }
+    const [moved] = state.serviceFormSongs.splice(fromIndex, 1);
+    state.serviceFormSongs.splice(toIndex, 0, moved);
+    state.serviceFormDragSongId = "";
+    renderSongEditorRows();
+  });
+
+  els.songEditorList.addEventListener("dragend", () => {
+    state.serviceFormDragSongId = "";
+    state.serviceFormDragSheet = { songId: "", sheetId: "" };
+    els.songEditorList.querySelectorAll(".song-editor-row.drag-over, .song-editor-row.dragging").forEach((node) => {
+      node.classList.remove("drag-over", "dragging");
+    });
+    els.songEditorList.querySelectorAll(".song-selected-sheet-item.drag-over, .song-selected-sheet-item.dragging").forEach((node) => {
+      node.classList.remove("drag-over", "dragging");
+    });
   });
 
   els.songEditorList.addEventListener("input", (event) => {
@@ -1006,8 +1224,9 @@ function bindEvents() {
           song.key
         );
         if (record) {
-          song.sheetId = record.id;
-          state.serviceFormSheetSearch[song.id] = formatSongSheetLabel(record);
+          attachSheetToSong(song, record.id, { append: isSongSheetAddMode(song) });
+          state.serviceFormSheetSearch[song.id] = "";
+          setSongSheetAddMode(song, false);
           setServicePacketStatus(`"${song.title || "곡"}" 악보를 Drive에서 연결했습니다.`);
           renderSongEditorRows();
         }
@@ -1021,9 +1240,9 @@ function bindEvents() {
       const sheetId = String(pickButton.dataset.sheetId || "");
       if (!Number.isNaN(index) && sheetId && state.serviceFormSongs[index]) {
         const song = state.serviceFormSongs[index];
-        const targetSheet = state.data.sheets.find((item) => item.id === sheetId);
-        song.sheetId = sheetId;
-        state.serviceFormSheetSearch[song.id] = targetSheet ? formatSongSheetLabel(targetSheet) : "";
+        attachSheetToSong(song, sheetId, { append: isSongSheetAddMode(song) });
+        state.serviceFormSheetSearch[song.id] = "";
+        setSongSheetAddMode(song, false);
         setServicePacketStatus(`"${song.title || "곡"}" 악보를 연결했습니다.`);
         renderSongEditorRows();
       }
@@ -1057,6 +1276,12 @@ function bindEvents() {
   });
 
   if (els.serviceMeditationEditor) {
+    els.serviceMeditationEditor.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        document.execCommand("insertLineBreak");
+      }
+    });
     els.serviceMeditationEditor.addEventListener("input", () => {
       els.serviceMeditation.value = els.serviceMeditationEditor.innerHTML;
       saveMeditationSelection();
@@ -1126,7 +1351,8 @@ function bindEvents() {
         tempo: song.tempo.trim(),
         referenceUrl: song.referenceUrl.trim(),
         comment: String(song.comment || "").trim(),
-        sheetId: String(song.sheetId || ""),
+        sheetIds: getSongSheetIds(song),
+        sheetId: getSongSheetIds(song)[0] || "",
         packetSelected: song.packetSelected !== false,
       }))
       .filter((song) => Boolean(song.title));
@@ -1145,6 +1371,8 @@ function bindEvents() {
       weeklyPacket: cloneWeeklyPacket(state.serviceFormWeeklyPacket),
     };
 
+    const returnPage = String(state.serviceEditorOriginPage || state.page || "home");
+
     state.data.services[date] = next;
     syncServiceToRotation(date);
     state.data.selectedServiceDate = date;
@@ -1153,6 +1381,20 @@ function bindEvents() {
     state.weeklyPacketMessage = "";
     renderAll();
     closeDialog(els.serviceEditorDialog);
+    setPage(returnPage);
+  });
+
+  els.serviceForm.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (!target) {
+      return;
+    }
+    if (target.closest('textarea[data-field="comment"]') || target.closest("#service-meditation-editor")) {
+      event.stopPropagation();
+    }
   });
 
   els.unavailabilityForm.addEventListener("submit", (event) => {
@@ -1284,6 +1526,7 @@ function openServiceEditorForDate(rawDate) {
   if (!date) {
     return;
   }
+  state.serviceEditorOriginPage = state.page || "home";
   ensureService(date);
   syncRotationToService(date);
   els.serviceDate.value = date;
@@ -1500,7 +1743,7 @@ function renderAll() {
   renderSheetUploadUi();
   renderSheetLibrary();
   renderRotation();
-  setDropzoneFileName(els.sheetSingleFileName, getSelectedSingleUploadFile() || null);
+  setDropzoneFileName(els.sheetSingleFileName, getSelectedSingleUploadFiles());
   setDropzoneFileName(els.sheetMergedFileName, getSelectedMergedUploadFile() || null);
 }
 
@@ -1514,7 +1757,8 @@ function renderHome() {
   els.homeServiceDate.value = homeDate || "";
 
   if (!service) {
-    els.homePracticeInfo.textContent = "연습 일정이 아직 없습니다.";
+    closeHomePacketPreview();
+    els.homePracticeInfo.textContent = "연습 일정 없음";
     els.homeVerse.innerHTML = renderVerseMarkup("");
     els.homeMeditation.innerHTML = renderMeditationMarkup("");
     els.homeSongList.innerHTML = `<p class="empty-note">아직 등록된 곡 리스트가 없습니다.</p>`;
@@ -1523,7 +1767,7 @@ function renderHome() {
     return;
   }
 
-  els.homePracticeInfo.textContent = formatPracticeSummary(service);
+  els.homePracticeInfo.textContent = formatHomePracticeSummary(service);
   els.homeVerse.innerHTML = renderVerseMarkup(service.verse || "");
   els.homeMeditation.innerHTML = renderMeditationMarkup(service.meditation || "");
   els.homePlaylist.innerHTML = renderPlaylistMarkup(service.playlistUrl);
@@ -1559,6 +1803,13 @@ function renderWeeklySheetStatus(service) {
   els.weeklySheetStatus.innerHTML = rows
     .map((row) => `<li class="${escapeHtml(row.className || "")}">${escapeHtml(row.text || "")}</li>`)
     .join("");
+
+  if (els.previewWeeklyPdf) {
+    els.previewWeeklyPdf.disabled = !(packet && packet.fileName);
+  }
+  if (!packet || !packet.fileName) {
+    closeHomePacketPreview();
+  }
 }
 
 function renderMeditationMarkup(rawMeditation) {
@@ -1940,7 +2191,14 @@ function renderVerseMarkup(rawVerse) {
 
 function isBibleReferenceHeading(value) {
   const line = String(value || "").trim();
-  return /^[1-3]?\s*[가-힣]+(?:[가-힣]+)?\s*\d+\s*[:：]\s*\d+(?:\s*-\s*\d+)?$/.test(line);
+  if (!line) {
+    return false;
+  }
+  return (
+    parseBibleReferencesInput(line).length > 0 ||
+    scanBibleReferencesFromText(line).length > 0 ||
+    scanBibleChapterOnlyReferencesFromText(line).length > 0
+  );
 }
 
 function formatVerseDisplayLine(value) {
@@ -1991,6 +2249,10 @@ function renderServiceSongCard(song) {
   const referenceUrl = String(song.referenceUrl || "").trim();
   const thumb = getYouTubeThumbnail(referenceUrl);
   const hasRef = isValidUrl(referenceUrl);
+  const commentHtml = String(song.comment || "")
+    .split(/\r?\n/)
+    .map((line) => escapeHtml(line))
+    .join("<br />");
 
   const thumbMarkup = hasRef && thumb
     ? `<a class="song-thumb-link" href="${escapeHtml(referenceUrl)}" target="_blank" rel="noopener noreferrer"><img class="song-thumb" src="${escapeHtml(
@@ -2010,7 +2272,7 @@ function renderServiceSongCard(song) {
             <span>템포: ${escapeHtml(tempo || "-")}</span>
             ${hasRef ? `<a class="inline-link" href="${escapeHtml(referenceUrl)}" target="_blank" rel="noopener noreferrer">레퍼런스</a>` : ""}
           </div>
-          ${song.comment ? `<p class="song-comment">${escapeHtml(song.comment)}</p>` : ""}
+          ${song.comment ? `<p class="song-comment">${commentHtml}</p>` : ""}
         </div>
         ${thumbMarkup}
       </div>
@@ -2124,6 +2386,18 @@ function renderCalendarDetail() {
   const songList = visibleSongs.length
     ? visibleSongs.map((song) => renderServiceSongCard(song)).join("")
     : `<p class="empty-note">아직 등록된 곡 리스트가 없습니다.</p>`;
+  const packet = normalizeWeeklyPacket(service.weeklyPacket);
+  const packetMarkup = packet
+    ? `
+      <article class="panel sheet-packet-panel">
+        <div class="panel-head-row">
+          <h3>전체악보</h3>
+          <button class="ghost-btn compact-btn" type="button" data-calendar-packet-download="${escapeHtmlAttr(selectedDate)}">악보 다운로드</button>
+        </div>
+        <p class="muted">${escapeHtml(packet.fileName || "이번주악보.pdf")}</p>
+      </article>
+    `
+    : "";
 
   els.calendarDetail.innerHTML = `
     <article class="panel date-switch">
@@ -2151,10 +2425,7 @@ function renderCalendarDetail() {
       <h3>곡 리스트</h3>
       <div class="song-list">${songList}</div>
     </article>
-    <article class="panel playlist-panel">
-      <h3>이번주 플레이리스트</h3>
-      <div>${renderPlaylistMarkup(service.playlistUrl)}</div>
-    </article>
+    ${packetMarkup}
   `;
 }
 
@@ -2263,6 +2534,13 @@ function renderSheetUploadUi() {
   els.sheetSingleForm.hidden = mode !== "single";
   els.sheetMergedForm.hidden = mode !== "merged";
 
+  if (els.sheetOpStatus) {
+    const slot = mode === "merged" ? els.sheetStatusSlotMerged : els.sheetStatusSlotSingle;
+    if (slot && els.sheetOpStatus.parentElement !== slot) {
+      slot.appendChild(els.sheetOpStatus);
+    }
+  }
+
   els.sheetModeButtons.forEach((button) => {
     const active = button.dataset.sheetMode === mode;
     button.classList.toggle("is-active", active);
@@ -2292,10 +2570,11 @@ function setSheetOperationStatus(message, busy = false) {
   els.sheetOpStatus.dataset.busy = busy ? "true" : "false";
 }
 
-function bindPdfDropzone(dropzone, input, onFileSelected = null) {
+function bindPdfDropzone(dropzone, input, onFileSelected = null, options = {}) {
   if (!dropzone || !input) {
     return;
   }
+  const allowMultiple = Boolean(options && options.multiple);
 
   let depth = 0;
   const activate = (on) => {
@@ -2339,27 +2618,31 @@ function bindPdfDropzone(dropzone, input, onFileSelected = null) {
     activate(false);
 
     const list = event.dataTransfer && event.dataTransfer.files;
-    const file = list && list[0];
-    if (!file) {
+    const picked = Array.from(list || []).filter(Boolean);
+    const files = allowMultiple ? picked : picked.slice(0, 1);
+    if (!files.length) {
       return;
     }
 
-    if (!isSheetUploadFile(file)) {
+    if (files.some((file) => !isSheetUploadFile(file))) {
       setSheetOperationStatus("PDF, PNG, JPG 파일만 업로드할 수 있습니다.", false);
       return;
     }
 
     if (typeof onFileSelected === "function") {
-      onFileSelected(file);
+      onFileSelected(allowMultiple ? files : files[0]);
     }
 
     try {
       const transfer = new DataTransfer();
-      transfer.items.add(file);
+      files.forEach((file) => transfer.items.add(file));
       input.files = transfer.files;
       input.dispatchEvent(new Event("change", { bubbles: true }));
     } catch {
-      setSheetOperationStatus(`파일 선택: ${file.name}`, false);
+      setSheetOperationStatus(
+        files.length > 1 ? `파일 선택: ${files.length}개` : `파일 선택: ${files[0].name}`,
+        false
+      );
     }
   });
 }
@@ -2419,18 +2702,64 @@ async function convertImageFileToPdf(file, fallbackTitle = "악보") {
   return new File([pdfBytes], pdfName, { type: "application/pdf" });
 }
 
+function normalizeSheetUploadFiles(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+  if (!value) {
+    return [];
+  }
+  return [value];
+}
+
+async function mergeSheetUploadFilesToPdf(filesInput, fallbackTitle = "악보") {
+  const files = normalizeSheetUploadFiles(filesInput);
+  if (!files.length) {
+    throw new Error("병합할 파일이 없습니다.");
+  }
+  if (!window.PDFLib || !window.PDFLib.PDFDocument) {
+    throw new Error("PDF 라이브러리를 찾을 수 없습니다.");
+  }
+
+  const merged = await window.PDFLib.PDFDocument.create();
+  for (const file of files) {
+    if (!isSheetUploadFile(file)) {
+      throw new Error("PDF, PNG, JPG 파일만 병합할 수 있습니다.");
+    }
+    const pdfSource = isImageFile(file) ? await convertImageFileToPdf(file, fallbackTitle) : file;
+    const sourceBytes = await pdfSource.arrayBuffer();
+    const source = await window.PDFLib.PDFDocument.load(sourceBytes);
+    const pageIndices = source.getPageIndices();
+    if (!pageIndices.length) {
+      continue;
+    }
+    const copied = await merged.copyPages(source, pageIndices);
+    copied.forEach((page) => merged.addPage(page));
+  }
+
+  if (!merged.getPageCount()) {
+    throw new Error("병합할 페이지가 없습니다.");
+  }
+
+  const mergedBytes = await merged.save();
+  const baseTitle = String(fallbackTitle || "").trim() || "악보";
+  const fileName = sanitizeFilename(`${baseTitle}.pdf`);
+  return new File([mergedBytes], fileName, { type: "application/pdf" });
+}
+
 async function onSingleFileSelected(fileOverride = null) {
-  const file = fileOverride || getSelectedSingleUploadFile();
+  const files = normalizeSheetUploadFiles(fileOverride || getSelectedSingleUploadFiles());
   resetSinglePreview(false);
-  if (!file) {
+  if (!files.length) {
     return;
   }
 
-  if (!isSheetUploadFile(file)) {
+  if (files.some((file) => !isSheetUploadFile(file))) {
     setSheetOperationStatus("PDF, PNG, JPG 파일만 업로드할 수 있습니다.", false);
     return;
   }
 
+  const file = files[0];
   if (!els.sheetSingleTitle.value.trim() || !els.sheetSingleKey.value.trim()) {
     const parsed = extractTitleKeyFromFilename(file.name);
     if (!els.sheetSingleTitle.value.trim()) {
@@ -2441,16 +2770,16 @@ async function onSingleFileSelected(fileOverride = null) {
     }
   }
   try {
-    await loadSinglePreview(file, true);
+    await loadSinglePreview(files, true);
     void updateDuplicateHintForSingle();
   } catch (error) {
     setSheetOperationStatus(`개별 미리보기 로딩 실패: ${error.message}`, false);
   }
 }
 
-async function loadSinglePreview(file = null, silent = false) {
-  const target = file || getSelectedSingleUploadFile();
-  if (!target) {
+async function loadSinglePreview(fileOrFiles = null, silent = false) {
+  const targets = normalizeSheetUploadFiles(fileOrFiles || getSelectedSingleUploadFiles());
+  if (!targets.length) {
     if (!silent) {
       setSheetOperationStatus("개별 업로드 파일을 먼저 선택하세요.", false);
     }
@@ -2458,18 +2787,26 @@ async function loadSinglePreview(file = null, silent = false) {
   }
 
   resetSinglePreview(false);
-  let previewFile = target;
-  if (isImageFile(target)) {
-    previewFile = await convertImageFileToPdf(target, "개별악보");
+  let previewFile;
+  if (targets.length > 1) {
+    const fallbackTitle = els.sheetSingleTitle.value.trim() || "개별악보";
+    previewFile = await mergeSheetUploadFilesToPdf(targets, fallbackTitle);
+  } else if (isImageFile(targets[0])) {
+    previewFile = await convertImageFileToPdf(targets[0], "개별악보");
+  } else {
+    previewFile = targets[0];
   }
   state.sheetUpload.singlePreviewUrl = URL.createObjectURL(previewFile);
   els.singlePreviewFrame.src = state.sheetUpload.singlePreviewUrl;
   els.singlePreviewWrap.hidden = false;
   if (!silent) {
+    const first = targets[0];
     setSheetOperationStatus(
-      isImageFile(target)
-        ? "개별 이미지 악보를 PDF로 변환해 미리보기를 불러왔습니다."
-        : "개별 악보 미리보기를 불러왔습니다.",
+      targets.length > 1
+        ? `파일 ${targets.length}개를 하나의 PDF로 합쳐 미리보기를 불러왔습니다.`
+        : isImageFile(first)
+          ? "개별 이미지 악보를 PDF로 변환해 미리보기를 불러왔습니다."
+          : "개별 악보 미리보기를 불러왔습니다.",
       false
     );
   }
@@ -2495,6 +2832,7 @@ function resetSinglePreview(clearFile = false) {
 
 function clearSingleUploadSelection() {
   state.sheetUpload.singleDroppedFile = null;
+  state.sheetUpload.singleDroppedFiles = [];
   if (els.sheetSingleFile) {
     els.sheetSingleFile.value = "";
   }
@@ -2503,10 +2841,18 @@ function clearSingleUploadSelection() {
 }
 
 function getSelectedSingleUploadFile() {
-  if (state.sheetUpload.singleDroppedFile) {
-    return state.sheetUpload.singleDroppedFile;
+  const files = getSelectedSingleUploadFiles();
+  return files[0] || null;
+}
+
+function getSelectedSingleUploadFiles() {
+  if (Array.isArray(state.sheetUpload.singleDroppedFiles) && state.sheetUpload.singleDroppedFiles.length) {
+    return [...state.sheetUpload.singleDroppedFiles];
   }
-  return els.sheetSingleFile.files && els.sheetSingleFile.files[0];
+  if (state.sheetUpload.singleDroppedFile) {
+    return [state.sheetUpload.singleDroppedFile];
+  }
+  return Array.from((els.sheetSingleFile && els.sheetSingleFile.files) || []);
 }
 
 function getSelectedMergedUploadFile() {
@@ -2516,11 +2862,20 @@ function getSelectedMergedUploadFile() {
   return els.sheetMergedFile.files && els.sheetMergedFile.files[0];
 }
 
-function setDropzoneFileName(element, file) {
+function setDropzoneFileName(element, fileOrFiles) {
   if (!element) {
     return;
   }
-  element.textContent = file ? `선택된 파일: ${file.name}` : "선택된 파일 없음";
+  const files = normalizeSheetUploadFiles(fileOrFiles);
+  if (!files.length) {
+    element.textContent = "선택된 파일 없음";
+    return;
+  }
+  if (files.length === 1) {
+    element.textContent = `선택된 파일: ${files[0].name}`;
+    return;
+  }
+  element.textContent = `선택된 파일: ${files.length}개 (첫 파일: ${files[0].name})`;
 }
 
 function resetMergedUploadState(clearFile = false) {
@@ -3239,12 +3594,13 @@ function stripKeySuffixFromTitleText(name) {
 async function onSingleSheetUpload(event) {
   event.preventDefault();
 
-  const selected = getSelectedSingleUploadFile();
-  if (!selected) {
+  const selectedFiles = getSelectedSingleUploadFiles();
+  const selected = selectedFiles[0] || null;
+  if (!selectedFiles.length || !selected) {
     setSheetOperationStatus("업로드 파일을 먼저 선택하세요.", false);
     return;
   }
-  if (!isSheetUploadFile(selected)) {
+  if (selectedFiles.some((file) => !isSheetUploadFile(file))) {
     setSheetOperationStatus("PDF, PNG, JPG 파일만 업로드할 수 있습니다.", false);
     return;
   }
@@ -3270,9 +3626,12 @@ async function onSingleSheetUpload(event) {
 
   setSheetOperationStatus("악보 업로드 중...", true);
   try {
-    const file = isImageFile(selected)
-      ? await convertImageFileToPdf(selected, title || "악보")
-      : selected;
+    const file =
+      selectedFiles.length > 1
+        ? await mergeSheetUploadFilesToPdf(selectedFiles, title || "악보")
+        : isImageFile(selected)
+          ? await convertImageFileToPdf(selected, title || "악보")
+          : selected;
     const fileId = generateId();
     const storage = await saveSheetFile(fileId, file);
     state.data.sheets.push(
@@ -3291,12 +3650,17 @@ async function onSingleSheetUpload(event) {
     saveData();
     els.sheetSingleForm.reset();
     state.sheetUpload.singleDroppedFile = null;
+    state.sheetUpload.singleDroppedFiles = [];
     setDropzoneFileName(els.sheetSingleFileName, null);
     resetSinglePreview(false);
     setDuplicateHint(els.sheetSingleDuplicate, els.sheetSingleDuplicateList, null);
     renderSheetLibrary();
     setSheetOperationStatus(
-      isImageFile(selected) ? "개별 이미지 악보를 PDF로 변환 후 저장 완료" : "개별 악보 저장 완료",
+      selectedFiles.length > 1
+        ? `개별 악보 ${selectedFiles.length}개를 PDF 1개로 합쳐 저장 완료`
+        : isImageFile(selected)
+          ? "개별 이미지 악보를 PDF로 변환 후 저장 완료"
+          : "개별 악보 저장 완료",
       false
     );
   } catch (error) {
@@ -3814,14 +4178,46 @@ function renderSongEditorRows() {
 
   els.songEditorList.innerHTML = state.serviceFormSongs
     .map((song, index) => {
-      const selectedSheet = state.data.sheets.find((item) => item.id === song.sheetId) || null;
-      const selectedLabel = selectedSheet ? formatSongSheetLabel(selectedSheet) : "";
-      const hasSheet = Boolean(song.sheetId && song.title);
+      const selectedSheetIds = getSongSheetIds(song);
+      const selectedSheets = selectedSheetIds
+        .map((id) => state.data.sheets.find((item) => item.id === id))
+        .filter(Boolean);
+      const hasSheet = Boolean(selectedSheets.length && song.title);
       const includeInPacket = song.packetSelected !== false;
-      const sheetSearchQuery = getServiceFormSheetSearchQuery(song, selectedSheet);
+      const sheetSearchQuery = getServiceFormSheetSearchQuery(song, selectedSheets[0] || null);
       const searchResults = renderSongSheetSearchResults(song, index, sheetSearchQuery);
+      const addMode = isSongSheetAddMode(song);
+      const searchPlaceholder = addMode ? "추가할 악보 검색하기" : "악보 검색하기";
+      const showInlinePreview = Boolean(
+        state.serviceInlinePreviewUrl && state.serviceInlinePreviewSongId === song.id
+      );
+      const selectedListMarkup = selectedSheets.length
+        ? `
+          <div class="song-selected-sheet-list" data-song-selected-list="${index}">
+            ${selectedSheets
+              .map(
+                (sheet) => `
+                  <div class="song-selected-sheet-item" draggable="true" data-song-sheet-item="1" data-song-index="${index}" data-sheet-id="${sheet.id}">
+                    <span class="song-sheet-item-drag" title="드래그해서 악보 순서 변경">↕</span>
+                    <span class="song-selected-sheet-title">${escapeHtml(formatSongSheetLabel(sheet))}</span>
+                    <button class="ghost-btn compact-btn" type="button" data-song-action="preview-sheet" data-song-index="${index}" data-sheet-id="${sheet.id}">미리보기</button>
+                    <button class="ghost-btn compact-btn" type="button" data-song-action="remove-attached-sheet" data-song-index="${index}" data-sheet-id="${sheet.id}">삭제</button>
+                  </div>
+                `
+              )
+              .join("")}
+          </div>
+        `
+        : '<p class="muted">선택된 악보 없음</p>';
       return `
-      <div class="song-editor-row ${hasSheet ? "is-ready" : ""}" data-index="${index}" data-song-id="${escapeHtmlAttr(song.id)}">
+      <div class="song-editor-row ${hasSheet ? "is-ready" : ""} ${addMode ? "is-sheet-add-mode" : ""}" data-index="${index}" data-song-id="${escapeHtmlAttr(song.id)}">
+        <div class="song-editor-top">
+          <span class="muted">곡 ${index + 1}</span>
+          <div class="song-editor-top-actions">
+            <button class="ghost-btn compact-btn song-drag-handle" type="button" draggable="true" data-song-drag-handle="1" title="드래그해서 순서 변경">순서 이동</button>
+            <button class="ghost-btn compact-btn song-remove-btn" data-remove-song-index="${index}" type="button">삭제</button>
+          </div>
+        </div>
         <div class="song-editor-grid">
           <input data-field="title" type="text" placeholder="곡 제목" value="${escapeHtmlAttr(song.title)}" />
           <input data-field="key" type="text" placeholder="키" value="${escapeHtmlAttr(song.key)}" />
@@ -3832,25 +4228,36 @@ function renderSongEditorRows() {
           )}</textarea>
         </div>
         <div class="song-sheet-grid">
-          <input class="song-sheet-search-input" data-song-sheet-search="${index}" type="text" placeholder="악보 검색하기" value="${escapeHtmlAttr(
+          <input class="song-sheet-search-input" data-song-sheet-search="${index}" type="text" placeholder="${escapeHtmlAttr(searchPlaceholder)}" value="${escapeHtmlAttr(
             sheetSearchQuery
           )}" />
           <label class="sheet-merge-toggle">
             <input type="checkbox" data-song-action="toggle-packet" data-song-index="${index}" ${includeInPacket ? "checked" : ""} />
             합치기
           </label>
-          <button class="ghost-btn" type="button" data-song-action="upload" data-song-index="${index}">악보 업로드</button>
-          <button class="ghost-btn" type="button" data-song-action="preview" data-song-index="${index}" ${selectedSheet ? "" : "disabled"}>미리보기</button>
-          <button class="ghost-btn" type="button" data-song-action="clear-sheet" data-song-index="${index}" ${song.sheetId ? "" : "disabled"}>악보 삭제</button>
+          <button class="ghost-btn compact-btn ${addMode ? "is-active" : ""}" type="button" data-song-action="toggle-add-sheet" data-song-index="${index}">
+            악보추가
+          </button>
+          <button class="ghost-btn compact-btn" type="button" data-song-action="upload" data-song-index="${index}">악보 업로드</button>
+          <button class="ghost-btn compact-btn" type="button" data-song-action="preview" data-song-index="${index}" ${selectedSheets.length ? "" : "disabled"}>대표 미리보기</button>
           <input class="song-sheet-upload-input" data-song-upload-index="${index}" type="file" accept="application/pdf,image/png,image/jpeg" />
         </div>
+        ${
+          showInlinePreview
+            ? `<div class="inline-preview-wrap song-row-inline-preview">
+                <div class="inline-preview-head">
+                  <span>${escapeHtml(state.serviceInlinePreviewTitle || "악보 미리보기")}</span>
+                  <button class="ghost-btn compact-btn" type="button" data-song-action="close-inline-preview" data-song-index="${index}">미리보기 닫기</button>
+                </div>
+                <iframe class="song-row-preview-frame" src="${escapeHtmlAttr(state.serviceInlinePreviewUrl)}" title="악보 미리보기"></iframe>
+              </div>`
+            : ""
+        }
         <div class="song-sheet-search-results" data-song-sheet-results="${index}">
           ${searchResults}
         </div>
-        <p class="muted">${escapeHtml(selectedLabel ? `선택된 악보: ${selectedLabel}` : "선택된 악보 없음")}</p>
-        <div class="song-editor-row-actions">
-          <button class="ghost-btn" data-remove-song-index="${index}" type="button">삭제</button>
-        </div>
+        ${addMode ? '<p class="song-sheet-add-hint">추가 모드: 검색 결과에서 선택하면 기존 악보 뒤에 이어서 추가됩니다.</p>' : ""}
+        ${selectedListMarkup}
       </div>
     `
     })
@@ -3887,10 +4294,12 @@ function renderSongSheetSearchResultsIntoRow(row, index) {
 
 function renderSongSheetSearchResults(song, index, query) {
   const keyword = String(query || "").trim();
+  const addMode = isSongSheetAddMode(song);
   if (!keyword) {
     return "";
   }
 
+  const selectedIds = new Set(getSongSheetIds(song));
   const keywordKey = normalizeSheetLookup(keyword);
   const localCandidates = listSongSheetSearchCandidates(song, keyword).slice(0, 8);
   const localDriveIds = new Set(localCandidates.map((item) => String(item.driveFileId || "")).filter(Boolean));
@@ -3899,7 +4308,7 @@ function renderSongSheetSearchResults(song, index, query) {
 
   const localMarkup = localCandidates
     .map((sheet) => {
-      const selected = song.sheetId === sheet.id;
+      const selected = selectedIds.has(sheet.id);
       return `
         <button class="sheet-search-hit ${selected ? "is-selected" : ""}" type="button" data-song-sheet-pick="1" data-song-index="${index}" data-sheet-id="${sheet.id}">
           <span class="sheet-search-hit-title">${escapeHtml(formatSongSheetLabel(sheet))}</span>
@@ -3936,7 +4345,14 @@ function renderSongSheetSearchResults(song, index, query) {
     statusMarkup = `<p class="muted warn">${escapeHtml(driveState.error)}</p>`;
   }
 
-  if (!localMarkup && !driveMarkup && !statusMarkup) {
+  const driveDone = !isDriveEnabled() || (hasDriveForQuery && !driveState.loading);
+  if (selectedIds.size > 0 && !statusMarkup && !localMarkup && !driveMarkup && !addMode) {
+    return "";
+  }
+  if (!localMarkup && !driveMarkup && !statusMarkup && driveDone && addMode) {
+    return '<p class="muted">추가할 악보를 찾는 중입니다. 제목을 더 입력해보세요.</p>';
+  }
+  if (!localMarkup && !driveMarkup && !statusMarkup && driveDone && selectedIds.size === 0) {
     return '<p class="muted warn">검색 결과 없음. 악보 업로드로 추가하세요.</p>';
   }
 
@@ -3953,6 +4369,8 @@ function resetServiceFormSheetSearchState() {
   state.serviceFormDriveHits = {};
   state.serviceFormDriveTimers = {};
   state.serviceFormDriveSeq = {};
+  state.serviceFormSheetAddMode = {};
+  state.serviceFormDragSongId = "";
 }
 
 function clearSongSheetSearchState(songId) {
@@ -3968,6 +4386,7 @@ function clearSongSheetSearchState(songId) {
   delete state.serviceFormSheetSearch[key];
   delete state.serviceFormDriveHits[key];
   delete state.serviceFormDriveSeq[key];
+  delete state.serviceFormSheetAddMode[key];
 }
 
 function scheduleSongSheetDriveSearch(index, query) {
@@ -4055,6 +4474,7 @@ function listSongSheetSearchCandidates(song, query) {
   if (!keyword) {
     return [];
   }
+  const primarySheetId = getSongSheetIds(song)[0] || "";
 
   return state.data.sheets
     .filter((sheet) => {
@@ -4065,10 +4485,10 @@ function listSongSheetSearchCandidates(song, query) {
       );
     })
     .sort((left, right) => {
-      if (left.id === song.sheetId && right.id !== song.sheetId) {
+      if (left.id === primarySheetId && right.id !== primarySheetId) {
         return -1;
       }
-      if (right.id === song.sheetId && left.id !== song.sheetId) {
+      if (right.id === primarySheetId && left.id !== primarySheetId) {
         return 1;
       }
       return String(right.uploadedAt || "").localeCompare(String(left.uploadedAt || ""));
@@ -4079,8 +4499,7 @@ function updateBuildWeeklyPacketButtonState() {
   const targets = state.serviceFormSongs.filter(
     (song) => String(song.title || "").trim() && song.packetSelected !== false
   );
-  const canBuild =
-    targets.length > 0 && targets.every((song) => Boolean(String(song.sheetId || "").trim()));
+  const canBuild = targets.length > 0 && targets.every((song) => getSongSheetIds(song).length > 0);
   els.buildWeeklyPacket.disabled = !canBuild;
   els.buildWeeklyPacket.title = canBuild
     ? "준비된 곡 악보를 하나로 합칩니다."
@@ -4178,6 +4597,7 @@ function getSelectedService() {
 
 function loadServiceForm(date) {
   resetServiceFormSheetSearchState();
+  closeServiceInlinePreview(false);
 
   if (!date) {
     els.servicePracticeDate.value = "";
@@ -4215,17 +4635,17 @@ function loadServiceForm(date) {
   }));
   state.serviceFormSheetSearch = {};
   state.serviceFormSongs.forEach((song) => {
-    const selectedSheet = state.data.sheets.find((item) => item.id === song.sheetId);
-    state.serviceFormSheetSearch[song.id] = selectedSheet ? formatSongSheetLabel(selectedSheet) : "";
+    getSongSheetIds(song);
+    state.serviceFormSheetSearch[song.id] = "";
     state.serviceFormDriveHits[song.id] = { queryKey: "", items: [], loading: false, error: "" };
     state.serviceFormDriveSeq[song.id] = 0;
   });
   state.serviceFormWeeklyPacket = cloneWeeklyPacket(service.weeklyPacket);
   const packet = state.serviceFormWeeklyPacket;
   if (packet && packet.fileName) {
-    setServicePacketStatus(`현재 저장된 이번주 악보: ${packet.fileName}`);
+    setServicePacketStatus(`현재 저장된 이번주 악보: ${packet.fileName} · 새로 만들면 기존 파일이 업데이트됩니다.`);
   } else {
-    setServicePacketStatus("아직 합쳐진 이번주 악보가 없습니다.");
+    setServicePacketStatus("새로 만들면 기존 이번주 악보(있는 경우)가 업데이트됩니다.");
   }
 }
 
@@ -4951,6 +5371,68 @@ async function openSheetPreview(sheet) {
   }
 }
 
+function closeServiceInlinePreview(shouldRenderRows = true) {
+  const hadPreview = Boolean(state.serviceInlinePreviewUrl);
+  if (state.serviceInlinePreviewUrl) {
+    URL.revokeObjectURL(state.serviceInlinePreviewUrl);
+    state.serviceInlinePreviewUrl = "";
+  }
+  state.serviceInlinePreviewSongId = "";
+  state.serviceInlinePreviewTitle = "";
+  if (els.serviceInlinePreviewFrame) {
+    els.serviceInlinePreviewFrame.src = "";
+  }
+  if (els.serviceInlinePreviewWrap) {
+    els.serviceInlinePreviewWrap.hidden = true;
+  }
+  if (shouldRenderRows && hadPreview && els.serviceEditorDialog && els.serviceEditorDialog.open) {
+    renderSongEditorRows();
+  }
+}
+
+async function openServiceInlinePreview(sheet, titleText = "", songId = "") {
+  const blob = await resolveSheetBlob(sheet);
+  if (!blob) {
+    setServicePacketStatus("미리볼 악보 파일을 찾지 못했습니다.", true);
+    return;
+  }
+  closeServiceInlinePreview(false);
+  state.serviceInlinePreviewUrl = URL.createObjectURL(blob);
+  state.serviceInlinePreviewSongId = String(songId || "");
+  state.serviceInlinePreviewTitle = titleText || `${sheet.title || "악보"} 미리보기`;
+  if (els.serviceInlinePreviewFrame) {
+    els.serviceInlinePreviewFrame.src = "";
+  }
+  if (els.serviceInlinePreviewWrap) {
+    els.serviceInlinePreviewWrap.hidden = true;
+  }
+  renderSongEditorRows();
+}
+
+function closeHomePacketPreview() {
+  if (state.homePacketPreviewUrl) {
+    URL.revokeObjectURL(state.homePacketPreviewUrl);
+    state.homePacketPreviewUrl = "";
+  }
+  if (els.homePacketPreviewFrame) {
+    els.homePacketPreviewFrame.src = "";
+  }
+  if (els.homePacketPreviewWrap) {
+    els.homePacketPreviewWrap.hidden = true;
+  }
+}
+
+function openHomePacketPreview(blob) {
+  closeHomePacketPreview();
+  state.homePacketPreviewUrl = URL.createObjectURL(blob);
+  if (els.homePacketPreviewFrame) {
+    els.homePacketPreviewFrame.src = state.homePacketPreviewUrl;
+  }
+  if (els.homePacketPreviewWrap) {
+    els.homePacketPreviewWrap.hidden = false;
+  }
+}
+
 async function downloadSheet(sheet) {
   const blob = await resolveSheetBlob(sheet);
   if (!blob) {
@@ -5007,6 +5489,50 @@ async function downloadOrGenerateWeeklyPacket() {
   await generateWeeklyPacket();
 }
 
+async function previewWeeklyPacket() {
+  state.weeklyPacketMessage = "";
+  const service = getSelectedService();
+  if (!service) {
+    state.weeklyPacketMessage = "선택된 예배가 없습니다.";
+    renderHome();
+    return;
+  }
+
+  const packet = normalizeWeeklyPacket(service.weeklyPacket);
+  if (!packet) {
+    state.weeklyPacketMessage = "미리볼 이번주 악보가 없습니다.";
+    renderHome();
+    return;
+  }
+
+  const blob = await resolveSheetBlob(packet);
+  if (!blob) {
+    state.weeklyPacketMessage = "이번주 악보 파일을 찾을 수 없습니다.";
+    renderHome();
+    return;
+  }
+  openHomePacketPreview(blob);
+}
+
+async function downloadCalendarPacketByDate(date) {
+  const service = state.data.services[String(date || "")];
+  if (!service) {
+    window.alert("해당 날짜 예배 기록을 찾을 수 없습니다.");
+    return;
+  }
+  const packet = normalizeWeeklyPacket(service.weeklyPacket);
+  if (!packet) {
+    window.alert("해당 날짜에는 저장된 악보가 없습니다.");
+    return;
+  }
+  const blob = await resolveSheetBlob(packet);
+  if (!blob) {
+    window.alert("악보 파일을 찾을 수 없습니다.");
+    return;
+  }
+  downloadBlob(blob, packet.fileName || "이번주악보.pdf");
+}
+
 async function generateWeeklyPacket() {
   const service = getSelectedService();
   const selectedSongs = service
@@ -5041,7 +5567,7 @@ async function generateWeeklyPacket() {
   }
 
   try {
-    const mergedBlob = await buildMergedSheetBlob(picked.selectedSheets);
+    const mergedBlob = await buildMergedSheetBlob(picked.selectedSheets, { coverService: service });
     const filename = buildWeeklyPacketFilename(service.date, getServiceEventName(service.date));
     downloadBlob(mergedBlob, filename);
 
@@ -5065,7 +5591,8 @@ async function buildWeeklyPacketForEditor() {
     ...song,
     title: String(song.title || "").trim(),
     key: String(song.key || "").trim(),
-    sheetId: String(song.sheetId || ""),
+    sheetIds: normalizeSongSheetIds(song),
+    sheetId: normalizeSongSheetIds(song)[0] || "",
     packetSelected: song.packetSelected !== false,
   }));
   const songs = state.serviceFormSongs.filter((song) => Boolean(song.title));
@@ -5081,7 +5608,7 @@ async function buildWeeklyPacketForEditor() {
     return;
   }
 
-  const notReady = selectedSongs.filter((song) => !String(song.sheetId || "").trim());
+  const notReady = selectedSongs.filter((song) => getSongSheetIds(song).length === 0);
   if (notReady.length) {
     setServicePacketStatus("선택한 곡에 악보를 연결한 뒤 다시 시도하세요.", true);
     return;
@@ -5101,7 +5628,14 @@ async function buildWeeklyPacketForEditor() {
 
   try {
     setServicePacketStatus("악보 합치는 중...", false);
-    const mergedBlob = await buildMergedSheetBlob(picked.selectedSheets);
+    const coverService = {
+      date,
+      practiceDate: els.servicePracticeDate.value || "",
+      practiceTime: String(els.servicePracticeTime.value || "").trim(),
+      verse: normalizeVerseTextareaText(els.serviceVerse.value),
+      meditation: getMeditationForSave(),
+    };
+    const mergedBlob = await buildMergedSheetBlob(picked.selectedSheets, { coverService });
     const serviceName = getServiceEventName(date);
     const fileName = buildWeeklyPacketFilename(date, serviceName);
     const packetFile = new File([mergedBlob], fileName, { type: "application/pdf" });
@@ -5142,14 +5676,24 @@ async function buildWeeklyPacketForEditor() {
     }
 
     renderSongEditorRows();
-    setServicePacketStatus(`이번주 악보 생성 완료: ${fileName} (저장 버튼을 눌러 반영)`);
+    setServicePacketStatus(`새 이번주 악보를 만들었습니다. 저장하면 기존 파일이 업데이트됩니다. (${fileName})`);
   } catch (error) {
     setServicePacketStatus(`악보 합치기 실패: ${error.message}`, true);
   }
 }
 
-async function buildMergedSheetBlob(selectedSheets) {
+async function buildMergedSheetBlob(selectedSheets, options = {}) {
   const merged = await window.PDFLib.PDFDocument.create();
+  const coverService = options && options.coverService ? options.coverService : null;
+
+  if (coverService) {
+    const coverBytes = await createWeeklyPacketCoverPdfBytes(coverService);
+    if (coverBytes && coverBytes.length) {
+      const coverDoc = await window.PDFLib.PDFDocument.load(coverBytes);
+      const coverPages = await merged.copyPages(coverDoc, coverDoc.getPageIndices());
+      coverPages.forEach((page) => merged.addPage(page));
+    }
+  }
 
   for (const item of selectedSheets) {
     const blob = await resolveSheetBlob(item.sheet);
@@ -5165,8 +5709,45 @@ async function buildMergedSheetBlob(selectedSheets) {
       continue;
     }
 
-    const pages = await merged.copyPages(source, pageIndices);
-    pages.forEach((page) => merged.addPage(page));
+    const commentRaw = extractPlainTextFromHtml(item.song && item.song.comment ? item.song.comment : "");
+    const hasComment = Boolean(commentRaw.trim());
+
+    for (let pos = 0; pos < pageIndices.length; pos += 1) {
+      const pageIndex = pageIndices[pos];
+      const isFirstPage = pos === 0;
+
+      if (isFirstPage && hasComment) {
+        const sourcePage = source.getPage(pageIndex);
+        const sourceWidth = sourcePage.getWidth();
+        const sourceHeight = sourcePage.getHeight();
+        const embeddedSourcePage = await merged.embedPage(sourcePage);
+        const headerImage = await createSongCommentHeaderPng(commentRaw, sourceWidth, sourceHeight);
+        if (!headerImage || !headerImage.bytes || !headerImage.height) {
+          const [copiedFallback] = await merged.copyPages(source, [pageIndex]);
+          merged.addPage(copiedFallback);
+          continue;
+        }
+        const embeddedHeaderImage = await merged.embedPng(headerImage.bytes);
+        const headerHeight = headerImage.height;
+        const targetPage = merged.addPage([sourceWidth, sourceHeight + headerHeight]);
+        targetPage.drawPage(embeddedSourcePage, {
+          x: 0,
+          y: 0,
+          width: sourceWidth,
+          height: sourceHeight,
+        });
+        targetPage.drawImage(embeddedHeaderImage, {
+          x: 0,
+          y: sourceHeight,
+          width: sourceWidth,
+          height: headerHeight,
+        });
+        continue;
+      }
+
+      const [copiedPage] = await merged.copyPages(source, [pageIndex]);
+      merged.addPage(copiedPage);
+    }
   }
 
   if (!merged.getPageCount()) {
@@ -5177,19 +5758,584 @@ async function buildMergedSheetBlob(selectedSheets) {
   return new Blob([mergedBytes], { type: "application/pdf" });
 }
 
+async function createSongCommentHeaderPng(commentText, pageWidth, pageHeight) {
+  const sourceLines = String(commentText || "")
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim());
+  const hasVisibleLine = sourceLines.some((line) => Boolean(line));
+  if (!hasVisibleLine) {
+    return null;
+  }
+
+  const widthPt = Math.max(360, Number(pageWidth || 0) || 1200);
+  const heightPt = Math.max(480, Number(pageHeight || 0) || 1700);
+  const scale = 2;
+  const canvasWidth = Math.round(widthPt * scale);
+  const sidePad = Math.max(30, Math.round(canvasWidth * 0.045));
+  const maxTextWidth = canvasWidth - sidePad * 2;
+  const baseFont = Math.max(30, Math.round(canvasWidth * 0.07));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasWidth;
+  canvas.height = 10;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return null;
+  }
+
+  const longestLine = sourceLines.reduce((acc, line) => {
+    return line.length > acc.length ? line : acc;
+  }, "");
+  let sharedSize = baseFont;
+  while (sharedSize > 12) {
+    ctx.font = `700 ${sharedSize}px GmarketSansBold, GmarketSansTTFBold, sans-serif`;
+    if (ctx.measureText(longestLine || " ").width <= maxTextWidth) {
+      break;
+    }
+    sharedSize -= 1;
+  }
+  sharedSize = Math.max(12, sharedSize);
+
+  const lineGap = Math.max(8, Math.round(canvasWidth * 0.012));
+  const topPad = Math.max(16, Math.round(canvasWidth * 0.02));
+  const bottomPad = Math.max(16, Math.round(canvasWidth * 0.02));
+  const renderedLineHeight = Math.round(sharedSize * 1.1);
+  const totalTextHeight = sourceLines.length * renderedLineHeight + Math.max(0, sourceLines.length - 1) * lineGap;
+  const targetHeaderPt = Math.min(heightPt * 0.24, Math.max(46, (topPad + bottomPad + totalTextHeight) / scale));
+  const canvasHeight = Math.max(Math.round(targetHeaderPt * scale), topPad + bottomPad + totalTextHeight);
+  canvas.height = canvasHeight;
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  ctx.strokeStyle = "rgba(214,223,241,1)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, canvasHeight - 1);
+  ctx.lineTo(canvasWidth, canvasHeight - 1);
+  ctx.stroke();
+
+  let cursorY = topPad;
+  ctx.fillStyle = "#1a44c5";
+  sourceLines.forEach((line, idx) => {
+    ctx.font = `700 ${sharedSize}px GmarketSansBold, GmarketSansTTFBold, sans-serif`;
+    cursorY += sharedSize;
+    ctx.fillText(line || " ", sidePad, cursorY);
+    cursorY += Math.round(sharedSize * 0.1);
+    if (idx < sourceLines.length - 1) {
+      cursorY += lineGap;
+    }
+  });
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) {
+    return null;
+  }
+  return {
+    bytes: new Uint8Array(await blob.arrayBuffer()),
+    height: Math.round(canvasHeight / scale),
+  };
+}
+
+function extractPlainTextFromHtml(rawHtml) {
+  const source = String(rawHtml || "").trim();
+  if (!source) {
+    return "";
+  }
+  const withBreaks = source
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/\s*(p|div|li|h[1-6])\s*>/gi, "\n");
+  const stripped = withBreaks.replace(/<[^>]+>/g, "");
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = stripped;
+  return String(textarea.value || "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function wrapCanvasTextByWidth(ctx, text, maxWidth) {
+  const lines = [];
+  const paragraphs = String(text || "").replace(/\r/g, "").split("\n");
+  paragraphs.forEach((paragraph, index) => {
+    const raw = String(paragraph || "");
+    if (!raw) {
+      lines.push("");
+    } else {
+      let line = "";
+      for (const ch of raw) {
+        const candidate = `${line}${ch}`;
+        if (line && ctx.measureText(candidate).width > maxWidth) {
+          lines.push(line);
+          line = ch;
+        } else {
+          line = candidate;
+        }
+      }
+      if (line) {
+        lines.push(line);
+      }
+    }
+    if (index < paragraphs.length - 1 && raw) {
+      lines.push("");
+    }
+  });
+  return lines;
+}
+
+function clampCanvasLines(ctx, lines, maxWidth, maxLines) {
+  const safe = Array.isArray(lines) ? [...lines] : [];
+  if (safe.length <= maxLines) {
+    return safe;
+  }
+  const clamped = safe.slice(0, maxLines);
+  let tail = String(clamped[maxLines - 1] || "").trim();
+  if (!tail) {
+    tail = "...";
+  } else {
+    const ellipsis = "...";
+    while (tail && ctx.measureText(`${tail}${ellipsis}`).width > maxWidth) {
+      tail = tail.slice(0, -1);
+    }
+    tail = `${tail}${ellipsis}`;
+  }
+  clamped[maxLines - 1] = tail;
+  return clamped;
+}
+
+function loadImageElement(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("이미지를 불러오지 못했습니다."));
+    image.src = src;
+  });
+}
+
+function measureOpaqueImageBounds(image) {
+  const w = Math.max(1, Number(image && image.width) || 1);
+  const h = Math.max(1, Number(image && image.height) || 1);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return { x: 0, y: 0, width: w, height: h };
+  }
+  ctx.drawImage(image, 0, 0, w, h);
+  const data = ctx.getImageData(0, 0, w, h).data;
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < h; y += 1) {
+    const rowOffset = y * w * 4;
+    for (let x = 0; x < w; x += 1) {
+      const alpha = data[rowOffset + x * 4 + 3];
+      if (alpha > 12) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < minX || maxY < minY) {
+    return { x: 0, y: 0, width: w, height: h };
+  }
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX + 1),
+    height: Math.max(1, maxY - minY + 1),
+  };
+}
+
+function buildCoverVerseItems(verseText) {
+  const rawLines = String(verseText || "").replace(/\r/g, "").split("\n");
+  const items = [];
+  rawLines.forEach((line) => {
+    const trimmed = String(line || "").trim();
+    if (!trimmed) {
+      items.push({ type: "blank" });
+      return;
+    }
+    if (isBibleReferenceHeading(trimmed)) {
+      items.push({ type: "heading", text: trimmed });
+      return;
+    }
+    const verseMatch = trimmed.match(/^(\d+)\s*[\.\)]?\s*(.+)$/);
+    if (verseMatch) {
+      items.push({ type: "verse", number: verseMatch[1], text: verseMatch[2] });
+      return;
+    }
+    items.push({ type: "text", text: trimmed });
+  });
+  return items;
+}
+
+function measureCoverVerseLayout(ctx, items, options) {
+  const {
+    width,
+    headingSize,
+    bodySize,
+    headingGap,
+    lineGap,
+    numberColWidth,
+  } = options;
+  const bodyLineHeight = Math.max(bodySize + 2, bodySize * 1.36);
+  const headingLineHeight = Math.max(headingSize + 3, headingSize * 1.3);
+  const flows = [];
+  let totalHeight = 0;
+
+  items.forEach((item) => {
+    if (item.type === "blank") {
+      totalHeight += Math.max(5, lineGap);
+      flows.push({ type: "blank", height: Math.max(5, lineGap) });
+      return;
+    }
+
+    if (item.type === "heading") {
+      totalHeight += headingLineHeight;
+      flows.push({ type: "heading", text: item.text, height: headingLineHeight });
+      totalHeight += headingGap;
+      flows.push({ type: "gap", height: headingGap });
+      return;
+    }
+
+    if (item.type === "verse") {
+      ctx.font = `400 ${bodySize}px ChosunNm, GmarketSansLight, sans-serif`;
+      const wrapped = wrapCanvasTextByWidth(
+        ctx,
+        item.text,
+        Math.max(40, width - numberColWidth - 8)
+      );
+      const lines = wrapped.length ? wrapped : [item.text];
+      const height = lines.length * bodyLineHeight + lineGap;
+      totalHeight += height;
+      flows.push({
+        type: "verse",
+        number: item.number,
+        lines,
+        bodyLineHeight,
+        height,
+      });
+      return;
+    }
+
+    ctx.font = `400 ${bodySize}px ChosunNm, GmarketSansLight, sans-serif`;
+    const wrapped = wrapCanvasTextByWidth(ctx, item.text, Math.max(40, width - numberColWidth - 8));
+    const lines = wrapped.length ? wrapped : [item.text];
+    const height = lines.length * bodyLineHeight + lineGap;
+    totalHeight += height;
+    flows.push({
+      type: "text",
+      lines,
+      bodyLineHeight,
+      height,
+    });
+  });
+
+  return { totalHeight, flows, bodyLineHeight, headingLineHeight };
+}
+
+async function createSongCommentBannerPng(commentText, widthHint = 1200) {
+  const text = extractPlainTextFromHtml(commentText)
+    .replace(/\n+/g, " / ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!text) {
+    return null;
+  }
+
+  const canvasWidth = Math.max(1200, Math.floor(Number(widthHint || 1200) * 1.7));
+  const canvasHeight = 150;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return null;
+  }
+
+  ctx.fillStyle = "rgba(255,255,255,0.96)";
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+  ctx.strokeStyle = "rgba(26,68,197,0.26)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, canvasWidth - 2, canvasHeight - 2);
+
+  const baseLabel = "송폼/코멘트";
+  ctx.fillStyle = "#1a44c5";
+  ctx.font = "700 44px GmarketSansBold, sans-serif";
+  let composed = `${baseLabel}: ${text}`;
+  const maxWidth = canvasWidth - 64;
+  while (ctx.measureText(composed).width > maxWidth && composed.length > 16) {
+    composed = `${composed.slice(0, -2)}…`;
+  }
+  ctx.fillText(composed, 32, 94);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) {
+    return null;
+  }
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+async function createWeeklyPacketCoverPdfBytes(service) {
+  if (!window.PDFLib || !window.PDFLib.PDFDocument) {
+    return null;
+  }
+
+  const pageWidth = 1240;
+  const pageHeight = 1754;
+  const renderScale = 2;
+  const marginX = 96;
+  const canvas = document.createElement("canvas");
+  canvas.width = pageWidth * renderScale;
+  canvas.height = pageHeight * renderScale;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    return null;
+  }
+  ctx.scale(renderScale, renderScale);
+  ctx.imageSmoothingEnabled = true;
+  if ("imageSmoothingQuality" in ctx) {
+    ctx.imageSmoothingQuality = "high";
+  }
+
+  const headingColor = "#1a44c5";
+  const textColor = "#12161f";
+  const subtleColor = "#5f6678";
+  const contentWidth = pageWidth - marginX * 2;
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, pageWidth, pageHeight);
+
+  const serviceName = getServiceEventName(service.date || "");
+  const worshipDateText = service.date ? formatDate(service.date) : "-";
+  const practiceDateText = service.practiceDate ? formatDate(service.practiceDate) : "-";
+  const practiceTimeText = String(service.practiceTime || "").trim() || "-";
+
+  const sectionTopY = 92;
+  const rightX = pageWidth - marginX;
+  const infoLabelSize = 24;
+  const infoValueSize = 24;
+  const infoLineGap = 30;
+  const infoBlockGap = 48;
+  const infoBlockHeight = infoLineGap + infoBlockGap + infoLineGap;
+
+  let y = sectionTopY;
+  try {
+    const logoImage = await loadImageElement(`assets/logo/simple-1.png?v=${encodeURIComponent(APP_BUILD_ID)}`);
+    const bounds = measureOpaqueImageBounds(logoImage);
+    const logoRatio = bounds.width / bounds.height;
+    const logoH = Math.max(90, Math.round(infoBlockHeight * 1.02));
+    const logoW = Math.max(110, Math.round(logoH * logoRatio));
+    const logoY = sectionTopY + Math.round((infoBlockHeight - logoH) / 2);
+    ctx.drawImage(
+      logoImage,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+      marginX,
+      logoY,
+      logoW,
+      logoH
+    );
+    y = sectionTopY + infoBlockHeight + 28;
+  } catch {
+    y = sectionTopY + infoBlockHeight + 28;
+  }
+
+  let rightY = sectionTopY;
+  ctx.textAlign = "right";
+  ctx.fillStyle = headingColor;
+  ctx.font = `700 ${infoLabelSize}px GmarketSansBold, sans-serif`;
+  ctx.fillText("예배 날짜", rightX, rightY);
+  rightY += infoLineGap;
+  ctx.fillStyle = textColor;
+  ctx.font = `400 ${infoValueSize}px GmarketSansLight, sans-serif`;
+  ctx.fillText(`${worshipDateText} (${serviceName})`, rightX, rightY);
+  rightY += infoBlockGap;
+  ctx.fillStyle = headingColor;
+  ctx.font = `700 ${infoLabelSize}px GmarketSansBold, sans-serif`;
+  ctx.fillText("연습 일시", rightX, rightY);
+  rightY += infoLineGap;
+  ctx.fillStyle = textColor;
+  ctx.font = `400 ${infoValueSize}px GmarketSansLight, sans-serif`;
+  ctx.fillText(`${practiceDateText} · ${practiceTimeText}`, rightX, rightY);
+
+  ctx.textAlign = "left";
+  y = Math.max(y, rightY + 30);
+  ctx.strokeStyle = "#d7dceb";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(marginX, y);
+  ctx.lineTo(pageWidth - marginX, y);
+  ctx.stroke();
+  y += 28;
+
+  const sectionTop = y;
+  const sectionBottom = pageHeight - 72;
+  const sectionHeight = sectionBottom - sectionTop;
+  const columnGap = 30;
+  const columnWidth = Math.floor((contentWidth - columnGap) / 2);
+  const leftX = marginX;
+  const rightColX = marginX + columnWidth + columnGap;
+
+  ctx.fillStyle = headingColor;
+  ctx.font = "700 30px GmarketSansBold, sans-serif";
+  ctx.fillText("주제 말씀", leftX, sectionTop + 34);
+  ctx.fillText("설교 노트", rightColX, sectionTop + 34);
+
+  const boxTop = sectionTop + 54;
+  const boxHeight = sectionHeight - 54;
+  ctx.strokeStyle = "#dfe5f4";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(leftX, boxTop, columnWidth, boxHeight);
+  ctx.strokeRect(rightColX, boxTop, columnWidth, boxHeight);
+
+  const versePadding = 16;
+  const verseText = normalizeVerseTextareaText(service.verse || "").trim() || "입력된 주제 말씀이 없습니다.";
+  const verseWidth = columnWidth - versePadding * 2;
+  const verseHeight = boxHeight - versePadding * 2;
+  const verseItems = buildCoverVerseItems(verseText);
+  let bodySize = 24;
+  let headingSize = 29;
+  let numberColWidth = 48;
+  let lineGap = 8;
+  let headingGap = 14;
+  let verseLayout = null;
+  while (bodySize >= 12) {
+    headingSize = Math.max(bodySize + 4, 15);
+    numberColWidth = Math.max(34, Math.round(bodySize * 1.8));
+    lineGap = Math.max(4, Math.round(bodySize * 0.24));
+    headingGap = Math.max(8, Math.round(bodySize * 0.45));
+    verseLayout = measureCoverVerseLayout(ctx, verseItems, {
+      width: verseWidth,
+      headingSize,
+      bodySize,
+      headingGap,
+      lineGap,
+      numberColWidth,
+    });
+    if (verseLayout.totalHeight <= verseHeight) {
+      break;
+    }
+    bodySize -= 1;
+  }
+  if (!verseLayout) {
+    verseLayout = measureCoverVerseLayout(ctx, verseItems, {
+      width: verseWidth,
+      headingSize,
+      bodySize: Math.max(12, bodySize),
+      headingGap,
+      lineGap,
+      numberColWidth,
+    });
+  }
+
+  const maxContentBottom = boxTop + boxHeight - versePadding;
+  let verseY = boxTop + versePadding;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  verseLayout.flows.forEach((flow) => {
+    if (verseY >= maxContentBottom) {
+      return;
+    }
+    if (flow.type === "blank" || flow.type === "gap") {
+      verseY += flow.height;
+      return;
+    }
+    if (flow.type === "heading") {
+      ctx.fillStyle = headingColor;
+      ctx.font = `700 ${headingSize}px ChosunNm, GmarketSansBold, sans-serif`;
+      ctx.fillText(flow.text, leftX + versePadding, verseY);
+      verseY += flow.height;
+      return;
+    }
+    if (flow.type === "verse") {
+      ctx.fillStyle = textColor;
+      ctx.font = `400 ${bodySize}px ChosunNm, GmarketSansLight, sans-serif`;
+      flow.lines.forEach((line, idx) => {
+        if (verseY >= maxContentBottom) {
+          return;
+        }
+        if (idx === 0) {
+          ctx.fillText(`${flow.number}.`, leftX + versePadding, verseY);
+        }
+        ctx.fillText(line || " ", leftX + versePadding + numberColWidth, verseY);
+        verseY += flow.bodyLineHeight;
+      });
+      verseY += Math.max(0, flow.height - flow.lines.length * flow.bodyLineHeight);
+      return;
+    }
+    if (flow.type === "text") {
+      ctx.fillStyle = textColor;
+      ctx.font = `400 ${bodySize}px ChosunNm, GmarketSansLight, sans-serif`;
+      flow.lines.forEach((line) => {
+        if (verseY >= maxContentBottom) {
+          return;
+        }
+        ctx.fillText(line || " ", leftX + versePadding, verseY);
+        verseY += flow.bodyLineHeight;
+      });
+      verseY += Math.max(0, flow.height - flow.lines.length * flow.bodyLineHeight);
+    }
+  });
+  ctx.textBaseline = "alphabetic";
+
+  ctx.strokeStyle = "#e7ebf6";
+  ctx.lineWidth = 1;
+  const noteInnerTop = boxTop + 18;
+  const noteInnerBottom = boxTop + boxHeight - 16;
+  for (let lineY = noteInnerTop; lineY <= noteInnerBottom; lineY += 36) {
+    ctx.beginPath();
+    ctx.moveTo(rightColX + 14, lineY);
+    ctx.lineTo(rightColX + columnWidth - 14, lineY);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = subtleColor;
+  ctx.font = "400 20px GmarketSansLight, sans-serif";
+  const generatedAt = formatDateTime(new Date().toISOString());
+  ctx.fillText(`Generated by DOER Worship · ${generatedAt}`, marginX, pageHeight - 32);
+
+  const imageBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!imageBlob) {
+    return null;
+  }
+
+  const imageBytes = await imageBlob.arrayBuffer();
+  const pdfDoc = await window.PDFLib.PDFDocument.create();
+  const image = await pdfDoc.embedPng(imageBytes);
+  const page = pdfDoc.addPage([pageWidth, pageHeight]);
+  page.drawImage(image, { x: 0, y: 0, width: pageWidth, height: pageHeight });
+  return pdfDoc.save();
+}
+
 function collectSongSheetsForPacket(songs) {
   const selectedSheets = [];
   const missingSongs = [];
 
   songs.forEach((song, index) => {
-    const chosen = state.data.sheets.find((item) => item.id === song.sheetId) || null;
-
-    if (!chosen) {
+    const sheetIds = getSongSheetIds(song);
+    if (!sheetIds.length) {
       missingSongs.push(song.title || `곡 ${index + 1}`);
       return;
     }
-
-    selectedSheets.push({ song, sheet: chosen });
+    const matched = sheetIds
+      .map((id) => state.data.sheets.find((item) => item.id === id) || null)
+      .filter(Boolean);
+    if (!matched.length) {
+      missingSongs.push(song.title || `곡 ${index + 1}`);
+      return;
+    }
+    matched.forEach((sheet) => {
+      selectedSheets.push({ song, sheet });
+    });
   });
 
   return {
@@ -5225,9 +6371,17 @@ async function handleSongRowAction(button) {
   if (Number.isNaN(index) || !state.serviceFormSongs[index]) {
     return;
   }
+  const song = state.serviceFormSongs[index];
 
   if (action === "find") {
     await findAndAttachSheetForSong(index);
+    return;
+  }
+
+  if (action === "toggle-add-sheet") {
+    const nextOn = !isSongSheetAddMode(song);
+    setSongSheetAddMode(song, nextOn);
+    renderSongEditorRows();
     return;
   }
 
@@ -5244,19 +6398,43 @@ async function handleSongRowAction(button) {
   }
 
   if (action === "preview") {
-    const song = state.serviceFormSongs[index];
-    const sheet = state.data.sheets.find((item) => item.id === song.sheetId);
+    const firstSheetId = getSongSheetIds(song)[0] || "";
+    const sheet = state.data.sheets.find((item) => item.id === firstSheetId);
     if (!sheet) {
       setServicePacketStatus("미리볼 악보가 선택되지 않았습니다.", true);
       return;
     }
-    await openSheetPreview(sheet);
+    await openServiceInlinePreview(sheet, `${song.title || sheet.title || "악보"} 미리보기`, song.id);
+    return;
+  }
+
+  if (action === "preview-sheet") {
+    const sheetId = String(button.dataset.sheetId || "");
+    const sheet = state.data.sheets.find((item) => item.id === sheetId);
+    if (!sheet) {
+      setServicePacketStatus("미리볼 악보를 찾지 못했습니다.", true);
+      return;
+    }
+    await openServiceInlinePreview(sheet, `${song.title || sheet.title || "악보"} 미리보기`, song.id);
+    return;
+  }
+
+  if (action === "close-inline-preview") {
+    closeServiceInlinePreview();
+    return;
+  }
+
+  if (action === "remove-attached-sheet") {
+    const sheetId = String(button.dataset.sheetId || "");
+    detachSheetFromSong(song, sheetId);
+    renderSongEditorRows();
+    setServicePacketStatus(`"${song.title || "곡"}" 악보 연결을 일부 해제했습니다.`);
     return;
   }
 
   if (action === "clear-sheet") {
-    const song = state.serviceFormSongs[index];
-    song.sheetId = "";
+    setSongSheetIds(song, []);
+    setSongSheetAddMode(song, false);
     state.serviceFormSheetSearch[song.id] = "";
     renderSongEditorRows();
     setServicePacketStatus(`"${song.title || "곡"}" 악보 연결을 해제했습니다.`);
@@ -5299,8 +6477,9 @@ async function findAndAttachSheetForSong(index) {
   }
 
   attached.sort((left, right) => String(right.uploadedAt || "").localeCompare(String(left.uploadedAt || "")));
-  song.sheetId = attached[0].id;
-  state.serviceFormSheetSearch[song.id] = formatSongSheetLabel(attached[0]);
+  attachSheetToSong(song, attached[0].id, { append: isSongSheetAddMode(song) });
+  state.serviceFormSheetSearch[song.id] = "";
+  setSongSheetAddMode(song, false);
   renderSongEditorRows();
   setServicePacketStatus(
     attached.length === 1
@@ -5362,8 +6541,9 @@ async function handleSongSheetUploadInput(uploadInput) {
     if (duplicate.exactCount > 0) {
       const linked = findBestSheetCandidateForSong(title, key);
       if (linked) {
-        song.sheetId = linked.id;
-        state.serviceFormSheetSearch[song.id] = formatSongSheetLabel(linked);
+        attachSheetToSong(song, linked.id, { append: isSongSheetAddMode(song) });
+        state.serviceFormSheetSearch[song.id] = "";
+        setSongSheetAddMode(song, false);
         renderSongEditorRows();
       }
       setServicePacketStatus(`"${title}"는 이미 있어 기존 악보로 연결했습니다.`);
@@ -5391,8 +6571,9 @@ async function handleSongSheetUploadInput(uploadInput) {
     });
 
     state.data.sheets.push(record);
-    song.sheetId = record.id;
-    state.serviceFormSheetSearch[song.id] = formatSongSheetLabel(record);
+    attachSheetToSong(song, record.id, { append: isSongSheetAddMode(song) });
+    state.serviceFormSheetSearch[song.id] = "";
+    setSongSheetAddMode(song, false);
     if (!song.title) {
       song.title = title;
     }
@@ -5893,7 +7074,8 @@ function normalizeServiceEntry(service, date) {
           tempo: String((song && song.tempo) || ""),
           referenceUrl: String((song && song.referenceUrl) || ""),
           comment: String((song && song.comment) || ""),
-          sheetId: String((song && song.sheetId) || ""),
+          sheetIds: normalizeSongSheetIds(song),
+          sheetId: normalizeSongSheetIds(song)[0] || "",
           packetSelected: song && Object.prototype.hasOwnProperty.call(song, "packetSelected")
             ? Boolean(song.packetSelected)
             : true,
@@ -5940,6 +7122,73 @@ function cloneWeeklyPacket(packet) {
   };
 }
 
+function normalizeSongSheetIds(song) {
+  const source = song && typeof song === "object" ? song : {};
+  const list = [];
+  if (Array.isArray(source.sheetIds)) {
+    source.sheetIds.forEach((id) => list.push(String(id || "")));
+  }
+  if (source.sheetId) {
+    list.push(String(source.sheetId || ""));
+  }
+  return Array.from(new Set(list.map((id) => id.trim()).filter(Boolean)));
+}
+
+function getSongSheetIds(song) {
+  const ids = normalizeSongSheetIds(song);
+  if (song && typeof song === "object") {
+    song.sheetIds = [...ids];
+    song.sheetId = ids[0] || "";
+  }
+  return ids;
+}
+
+function setSongSheetIds(song, ids) {
+  if (!song || typeof song !== "object") {
+    return;
+  }
+  const normalized = Array.from(new Set((ids || []).map((id) => String(id || "").trim()).filter(Boolean)));
+  song.sheetIds = normalized;
+  song.sheetId = normalized[0] || "";
+}
+
+function attachSheetToSong(song, sheetId, options = {}) {
+  const id = String(sheetId || "").trim();
+  if (!song || !id) {
+    return;
+  }
+  const append = options.append === true;
+  const current = getSongSheetIds(song);
+  if (!append) {
+    setSongSheetIds(song, [id]);
+    return;
+  }
+  setSongSheetIds(song, [...current, id]);
+}
+
+function detachSheetFromSong(song, sheetId) {
+  const id = String(sheetId || "").trim();
+  if (!song || !id) {
+    return;
+  }
+  const current = getSongSheetIds(song).filter((item) => item !== id);
+  setSongSheetIds(song, current);
+}
+
+function isSongSheetAddMode(song) {
+  if (!song || !song.id) {
+    return false;
+  }
+  return Boolean(state.serviceFormSheetAddMode[song.id]);
+}
+
+function setSongSheetAddMode(song, on) {
+  if (!song || !song.id) {
+    return;
+  }
+  state.serviceFormSheetAddMode[song.id] = Boolean(on);
+}
+
 function normalizeSheetEntry(sheet) {
   const source = sheet && typeof sheet === "object" ? sheet : {};
   const pageStart = Number(source.pageStart);
@@ -5966,6 +7215,7 @@ function makeEmptySong() {
     tempo: "",
     referenceUrl: "",
     comment: "",
+    sheetIds: [],
     sheetId: "",
     packetSelected: true,
   };
@@ -6111,7 +7361,7 @@ function parseBibleReferencesInput(raw) {
 
 function parseSingleBibleReference(text) {
   const source = String(text || "").trim();
-  const match = source.match(/([1-3]?\s*[가-힣]+)\s*(\d+)\s*[:：]\s*(\d+)(?:\s*-\s*(\d+))?/);
+  const match = source.match(/([1-3]?\s*[가-힣]+(?:\s*[가-힣]+)*)\s*(\d+)\s*[:：]\s*(\d+)(?:\s*-\s*(\d+))?/);
   if (!match) {
     return null;
   }
@@ -6141,7 +7391,7 @@ function parseSingleBibleReference(text) {
 
 function scanBibleReferencesFromText(raw) {
   const source = String(raw || "");
-  const pattern = /([1-3]?\s*[가-힣]+)\s*(\d+)\s*[:：]\s*(\d+)(?:\s*-\s*(\d+))?/g;
+  const pattern = /([1-3]?\s*[가-힣]+(?:\s*[가-힣]+)*)\s*(\d+)\s*[:：]\s*(\d+)(?:\s*-\s*(\d+))?/g;
   const refs = [];
   let match;
   while ((match = pattern.exec(source)) !== null) {
@@ -6150,6 +7400,34 @@ function scanBibleReferencesFromText(raw) {
     if (parsed) {
       refs.push(parsed);
     }
+  }
+  return refs;
+}
+
+function scanBibleChapterOnlyReferencesFromText(raw) {
+  const source = String(raw || "");
+  const pattern = /([1-3]?\s*[가-힣]+(?:\s*[가-힣]+)*)\s*(\d+)\s*장/g;
+  const refs = [];
+  let match;
+  while ((match = pattern.exec(source)) !== null) {
+    const rawBook = String(match[1] || "").replace(/\s+/g, "");
+    const chapter = Number(match[2] || 0);
+    if (!rawBook || !chapter) {
+      continue;
+    }
+    const normalizedBook = normalizeKoreanBookAlias(rawBook);
+    const code = BIBLE_BOOK_ALIASES[normalizedBook];
+    if (!code) {
+      continue;
+    }
+    const bookKo = BIBLE_BOOK_CODE_TO_KO[code] || rawBook;
+    refs.push({
+      code,
+      chapter,
+      verseStart: 1,
+      verseEnd: 999,
+      display: `${bookKo} ${chapter}장`,
+    });
   }
   return refs;
 }
@@ -6789,6 +8067,8 @@ function extractBibleChapterReferencesFromVerse(rawVerse, rawVerseRefs = "") {
   parseBibleReferencesInput(rawVerseRefs).forEach(pushRef);
   parseBibleReferencesInput(rawVerse).forEach(pushRef);
   scanBibleReferencesFromText(rawVerse).forEach(pushRef);
+  scanBibleChapterOnlyReferencesFromText(rawVerseRefs).forEach(pushRef);
+  scanBibleChapterOnlyReferencesFromText(rawVerse).forEach(pushRef);
   return refs;
 }
 
@@ -7016,6 +8296,13 @@ function formatPracticeSummary(service) {
   ].filter(Boolean);
 
   return chunks.length ? chunks.join("\n") : "연습 일정이 아직 없습니다.";
+}
+
+function formatHomePracticeSummary(service) {
+  const dateText = service && service.practiceDate ? formatDate(service.practiceDate) : "";
+  const timeText = service && service.practiceTime ? String(service.practiceTime || "").trim() : "";
+  const chunks = [dateText && `연습: ${dateText}`, timeText && `시간: ${timeText}`].filter(Boolean);
+  return chunks.length ? chunks.join(" / ") : "연습 일정 없음";
 }
 
 function renderPlaylistMarkup(url) {
