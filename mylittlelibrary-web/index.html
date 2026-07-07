@@ -93,6 +93,26 @@
   .btn-danger { background: #ffe9e9; color: #d33; }
   .empty { text-align: center; color: var(--sub); padding: 80px 20px; }
   .banner { background: #fff4e5; color: #9a5b00; padding: 12px 16px; border-radius: 14px; margin: 12px 0; font-size: 13px; }
+  /* home month rows + year + stats */
+  .yearbar { display:flex; gap:8px; padding:14px 0 4px; flex-wrap:wrap; }
+  .yearbtn { border:1px solid var(--line); background:#f5f5f7; border-radius:100px; padding:8px 16px; font-size:14px; font-weight:700; cursor:pointer; }
+  .monthrow { padding:22px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  .monthrow-head { display:flex; justify-content:space-between; align-items:baseline; }
+  .monthrow h2 { font-size:30px; font-weight:900; margin:0; }
+  .mrow-covers { display:flex; margin:14px 0 12px; }
+  .mrow-covers .cover { width:46px; flex:0 0 auto; margin-left:-14px; aspect-ratio:2/3; }
+  .mrow-covers .cover:first-child { margin-left:0; }
+  .mcounts { display:flex; gap:16px; font-size:13px; color:var(--sub); font-weight:600; }
+  .backbtn { background:#f0f0f2; border:none; border-radius:100px; padding:8px 16px; font-weight:700; cursor:pointer; margin:8px 0 4px; font-size:14px; }
+  .counthead { display:flex; margin:14px 0 6px; }
+  .cstat { flex:1; text-align:center; }
+  .cstat .n { font-size:26px; font-weight:900; }
+  .cstat .l { font-size:13px; color:var(--sub); font-weight:600; margin-top:4px; }
+  .cdiv { width:1px; background:var(--line); margin:2px 4px; }
+  .bars { display:flex; align-items:flex-end; gap:5px; height:180px; margin-top:12px; }
+  .bar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; cursor:pointer; }
+  .bar { width:100%; max-width:22px; min-height:2px; background:#85bfaa; border-radius:5px 5px 0 0; }
+  .bar-label { font-size:10px; color:var(--sub); margin-top:5px; }
 </style>
 </head>
 <body>
@@ -184,61 +204,113 @@
     }
   }
 
-  // ---- render ----
+  // ---- views / render ----
+  const MONTHS_EN = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+  const LOGOUT_SVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>';
+
+  function tracked(){ return books.filter(b => b.status !== "wishlist"); }
+  function groupByMonth(list){
+    const g = {};
+    list.forEach(b => { const d = anchorDate(b); const key = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+      (g[key] ||= {y:d.getFullYear(), m:d.getMonth()+1, items:[]}).items.push(b); });
+    return g;
+  }
+  function coverInner(b){
+    return b.coverImageURL
+      ? `<img src="${b.coverImageURL}" onerror="this.parentElement.innerHTML='<div class=ph>'+${JSON.stringify(escapeHtml(b.title))}+'</div>'"/>`
+      : `<div class="ph">${escapeHtml(b.title)}</div>`;
+  }
+  function cstat(s,n){ return `<div class="cstat"><div class="n">${n}</div><div class="l"><span class="dot" style="background:${STATUS[s].c}"></span>${STATUS[s].t}</div></div>`; }
+  function cdivEl(){ return `<div class="cdiv"></div>`; }
+  function sortToolbar(){
+    const sf = window._sortField ||= "readDate";
+    const asc = window._asc ??= false;
+    return `<div class="toolbar">
+      <select class="pill" onchange="setSort(this.value)">
+        <option value="readDate" ${sf=='readDate'?'selected':''}>읽은순</option>
+        <option value="rating" ${sf=='rating'?'selected':''}>평점순</option>
+        <option value="title" ${sf=='title'?'selected':''}>이름순</option>
+      </select>
+      <button class="pill" onclick="toggleAsc()">${asc?'오름차순 ↑':'내림차순 ↓'}</button>
+    </div>`;
+  }
+
+  window.goHome = () => { window._view = "home"; render(); scrollTo(0,0); };
+  window.openMonth = (key) => { window._view = { type:"month", key }; render(); scrollTo(0,0); };
+  window.openStats = (year) => { window._view = { type:"stats", year }; render(); scrollTo(0,0); };
+
   function render(){
     if (!currentUser) { renderLogin(); return; }
-    const sortField = (window._sortField ||= "readDate");
-    const asc = (window._asc ??= false);
-    const tracked = books.filter(b => b.status !== "wishlist");
-    // group by month
-    const groups = {};
-    tracked.forEach(b => { const d = anchorDate(b); const key = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
-      (groups[key] ||= {y:d.getFullYear(), m:d.getMonth()+1, items:[]}).items.push(b); });
+    const v = window._view || "home";
+    if (v && v.type === "month") renderMonth(v.key);
+    else if (v && v.type === "stats") renderStats(v.year);
+    else renderHome();
+  }
+
+  function renderHome(){
+    const t = tracked();
+    const groups = groupByMonth(t);
     const keys = Object.keys(groups).sort().reverse();
-
-    let html = `
-      <div class="wrap">
-        <div class="masthead">
-          <div class="topbtns">
-            <button class="icon-btn" onclick="openAdd()" title="책 추가">+</button>
-            <button class="icon-btn" onclick="logout()" title="로그아웃"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
-          </div>
-          <div class="kicker">Reading Journal</div>
-          <h1 class="title">My Little<br>Library</h1>
-          <div class="meta">${tracked.length} Books · ${keys.length} Months</div>
+    const years = [...new Set(t.map(b => anchorDate(b).getFullYear()))].sort((a,b)=>b-a);
+    let html = `<div class="wrap">
+      <div class="masthead">
+        <div class="topbtns">
+          <button class="icon-btn" onclick="openAdd()" title="책 추가">+</button>
+          <button class="icon-btn" onclick="logout()" title="로그아웃">${LOGOUT_SVG}</button>
         </div>
-        <div class="content">
-          <div class="toolbar">
-            <select class="pill" onchange="setSort(this.value)">
-              <option value="readDate" ${sortField=='readDate'?'selected':''}>읽은순</option>
-              <option value="rating" ${sortField=='rating'?'selected':''}>평점순</option>
-              <option value="title" ${sortField=='title'?'selected':''}>이름순</option>
-            </select>
-            <button class="pill" onclick="toggleAsc()">${asc?'오름차순 ↑':'내림차순 ↓'}</button>
-          </div>`;
-
-    if (keys.length === 0) {
-      html += `<div class="empty">아직 기록한 책이 없어요.<br>오른쪽 위 + 로 첫 책을 추가하세요.</div>`;
-    }
-    for (const k of keys) {
+        <div class="kicker">Reading Journal</div>
+        <h1 class="title">My Little<br>Library</h1>
+        <div class="meta">${t.length} Books · ${keys.length} Months</div>
+      </div>
+      <div class="content">`;
+    if (years.length) html += `<div class="yearbar">${years.map(y=>`<button class="yearbtn" onclick="openStats(${y})">${y}</button>`).join("")}</div>`;
+    if (!keys.length) html += `<div class="empty">아직 기록한 책이 없어요.<br>오른쪽 위 +로 첫 책을 추가하세요.</div>`;
+    for (const k of keys){
       const g = groups[k];
       const cnt = s => g.items.filter(b=>b.status===s).length;
-      const sorted = sortBooks(g.items, sortField, asc);
-      html += `<div class="month">
-        <div style="display:flex;justify-content:space-between;align-items:baseline">
-          <h2>${MONTHS[g.m]}</h2><span class="mdate">${String(g.m).padStart(2,"0")} / ${g.y}</span>
-        </div>
-        <div class="counts">
+      const previews = g.items.slice(0,6).map(b=>`<div class="cover">${coverInner(b)}</div>`).join("");
+      html += `<div class="monthrow" onclick="openMonth('${k}')">
+        <div class="monthrow-head"><h2>${MONTHS_EN[g.m]}</h2><span class="mdate">${String(g.m).padStart(2,"0")} / ${g.y}</span></div>
+        <div class="mrow-covers">${previews}</div>
+        <div class="mcounts">
           <span><span class="dot" style="background:${STATUS.finished.c}"></span>완독 ${cnt("finished")}</span>
           <span><span class="dot" style="background:${STATUS.reading.c}"></span>읽는중 ${cnt("reading")}</span>
           <span><span class="dot" style="background:${STATUS.dropped.c}"></span>하차 ${cnt("dropped")}</span>
         </div>
-        <div class="grid">${sorted.map(cardHTML).join("")}</div>
-        <div class="divider"></div>
       </div>`;
     }
     html += `</div></div>`;
     appEl.innerHTML = html;
+  }
+
+  function renderMonth(key){
+    const g = groupByMonth(tracked())[key];
+    if (!g){ goHome(); return; }
+    const cnt = s => g.items.filter(b=>b.status===s).length;
+    const sorted = sortBooks(g.items, window._sortField||"readDate", window._asc??false);
+    appEl.innerHTML = `<div class="wrap"><div class="content" style="padding-top:52px">
+      <button class="backbtn" onclick="goHome()">← 홈</button>
+      <h1 style="font-size:34px;font-weight:900;margin:6px 0 0">${MONTHS_EN[g.m]} ${g.y}</h1>
+      <div class="counthead">${cstat("finished",cnt("finished"))}${cdivEl()}${cstat("reading",cnt("reading"))}${cdivEl()}${cstat("dropped",cnt("dropped"))}</div>
+      ${sortToolbar()}
+      <div class="grid">${sorted.map(cardHTML).join("")}</div>
+    </div></div>`;
+  }
+
+  function renderStats(year){
+    const t = tracked().filter(b => anchorDate(b).getFullYear()===year);
+    const cnt = s => t.filter(b=>b.status===s).length;
+    const monthly = Array.from({length:12},(_,i)=> t.filter(b=>b.status==="finished" && anchorDate(b).getMonth()===i).length);
+    const max = Math.max(1, ...monthly);
+    const bars = monthly.map((val,i)=>`<div class="bar-col" onclick="openMonth('${year}-${String(i+1).padStart(2,'0')}')"><div class="bar" style="height:${Math.round(val/max*100)}%"></div><div class="bar-label">${i+1}</div></div>`).join("");
+    appEl.innerHTML = `<div class="wrap"><div class="content" style="padding-top:52px">
+      <button class="backbtn" onclick="goHome()">← 홈</button>
+      <div class="kicker" style="color:var(--sub)">Yearly Stats</div>
+      <h1 style="font-size:44px;font-weight:900;margin:6px 0 0">${year}</h1>
+      <div class="counthead">${cstat("finished",cnt("finished"))}${cdivEl()}${cstat("reading",cnt("reading"))}${cdivEl()}${cstat("dropped",cnt("dropped"))}</div>
+      <div class="kicker" style="color:var(--sub);margin-top:18px">월별 완독 (막대 탭 → 그 달)</div>
+      <div class="bars">${bars}</div>
+    </div></div>`;
   }
 
   function sortBooks(arr, field, asc){
