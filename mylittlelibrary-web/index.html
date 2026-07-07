@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>My Little Library</title>
+<!-- 홈 화면에 추가 시 앱처럼 보이게(PWA) -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="My Little Library" />
+<meta name="theme-color" content="#ffffff" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="icon" href="apple-touch-icon.png" />
+<style>
+  :root {
+    --ink: #1c1c1e; --sub: #8a8a8e; --line: #e6e6ea; --bg: #ffffff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", system-ui, sans-serif; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  /* iridescent header */
+  .masthead { position: relative; overflow: hidden; padding: 64px 24px 28px; }
+  .masthead::before { content: ""; position: absolute; inset: -40%; z-index: 0;
+    background:
+      radial-gradient(closest-side at 20% 30%, #f6d5e2, transparent),
+      radial-gradient(closest-side at 78% 24%, #cfe0fb, transparent),
+      radial-gradient(closest-side at 30% 78%, #d6f2e6, transparent),
+      radial-gradient(closest-side at 82% 82%, #fde9d3, transparent);
+    filter: blur(40px); animation: drift 18s ease-in-out infinite alternate; }
+  @keyframes drift { from { transform: translate(-4%, -3%) scale(1.05) } to { transform: translate(4%, 4%) scale(1.15) } }
+  .masthead > * { position: relative; z-index: 1; }
+  .kicker { font: 600 11px/1 ui-monospace, monospace; letter-spacing: 2px; color: rgba(255,255,255,.95); text-transform: uppercase; }
+  h1.title { margin: 10px 0 6px; font-size: 46px; font-weight: 900; letter-spacing: -1px; color: #fff;
+    text-shadow: 0 3px 12px rgba(0,0,0,.15); line-height: .98; }
+  .meta { font: 600 12px/1 ui-monospace, monospace; letter-spacing: 1.5px; color: rgba(255,255,255,.92); text-transform: uppercase; }
+  .topbtns { position: absolute; top: 54px; right: 20px; z-index: 2; display: flex; gap: 8px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(255,255,255,.55); backdrop-filter: blur(10px); font-size: 18px; color: var(--ink); }
+  /* content */
+  .content { padding: 8px 24px 80px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; padding: 14px 0; flex-wrap: wrap; }
+  .pill { border: 1px solid var(--line); background: #f5f5f7; border-radius: 100px; padding: 7px 14px;
+    font-size: 13px; font-weight: 600; cursor: pointer; }
+  select.pill { -webkit-appearance: none; appearance: none; }
+  .month { margin-top: 30px; }
+  .month h2 { font-size: 28px; font-weight: 900; margin: 0 0 4px; }
+  .month .mdate { font: 600 12px/1 ui-monospace, monospace; color: var(--sub); }
+  .counts { display: flex; gap: 16px; margin: 12px 0; font-size: 13px; color: var(--sub); font-weight: 600; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 10px; }
+  @media (min-width: 620px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+  .card { cursor: pointer; }
+  .cover { width: 100%; aspect-ratio: 2/3; border-radius: 8px; overflow: hidden; background: #fff;
+    box-shadow: 0 4px 12px rgba(0,0,0,.10); border: .5px solid rgba(0,0,0,.08); display: flex; }
+  .cover img { width: 100%; height: 100%; object-fit: cover; }
+  .cover .ph { padding: 8px; font-weight: 800; font-size: 15px; align-self: flex-end; }
+  .card .bt { font-size: 14px; font-weight: 700; margin-top: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .ba { font-size: 11px; color: var(--sub); }
+  .card .stars { color: #f5b301; font-size: 13px; letter-spacing: 1px; margin-top: 2px; }
+  .card .br { font-size: 12px; color: var(--sub); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .divider { height: 1px; background: var(--line); margin: 28px 0 0; }
+  /* login */
+  .login { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 48px 28px; position: relative; overflow: hidden; }
+  .login::before { content:""; position:absolute; inset:-30%; z-index:0;
+    background: radial-gradient(closest-side at 25% 35%, #f6d5e2, transparent),
+      radial-gradient(closest-side at 75% 30%, #cfe0fb, transparent),
+      radial-gradient(closest-side at 40% 80%, #d6f2e6, transparent),
+      radial-gradient(closest-side at 80% 75%, #fde9d3, transparent);
+    filter: blur(50px); animation: drift 18s ease-in-out infinite alternate; }
+  .login > * { position: relative; z-index: 1; }
+  .login h1 { font-size: 52px; font-weight: 900; letter-spacing: -1px; margin: 0; line-height: .98; }
+  .login p { color: var(--sub); font-size: 16px; font-weight: 500; }
+  .gbtn { margin-top: 24px; width: 100%; padding: 16px; border: none; border-radius: 100px; cursor: pointer;
+    background: var(--ink); color: #fff; font-size: 17px; font-weight: 600; box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+  /* modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none; align-items: flex-end; justify-content: center; z-index: 50; }
+  .modal-bg.open { display: flex; }
+  .modal { background: #fff; width: 100%; max-width: 560px; border-radius: 24px 24px 0 0; padding: 22px; max-height: 92vh; overflow: auto; }
+  @media (min-width: 620px) { .modal-bg { align-items: center; } .modal { border-radius: 24px; } }
+  .modal h3 { margin: 0 0 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .field label { font-size: 12px; color: var(--sub); font-weight: 600; }
+  .field input, .field textarea, .field select { border: 1px solid var(--line); border-radius: 12px; padding: 11px; font-size: 15px; font-family: inherit; }
+  .seg { display: flex; gap: 6px; }
+  .seg button { flex: 1; padding: 9px; border-radius: 100px; border: 1px solid var(--line); background: #f5f5f7; font-weight: 600; cursor: pointer; }
+  .seg button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+  .modal-actions button { flex: 1; padding: 14px; border-radius: 100px; border: none; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn-primary { background: var(--ink); color: #fff; }
+  .btn-ghost { background: #f0f0f2; color: var(--ink); }
+  .btn-danger { background: #ffe9e9; color: #d33; }
+  .empty { text-align: center; color: var(--sub); padding: 80px 20px; }
+  .banner { background: #fff4e5; color: #9a5b00; padding: 12px 16px; border-radius: 14px; margin: 12px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Add/Edit modal -->
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <h3 id="modalTitle">책 추가</h3>
+      <div class="field"><label>제목 (필수)</label><input id="f-title" /></div>
+      <div class="field"><label>저자</label><input id="f-author" /></div>
+      <div class="field"><label>출판사</label><input id="f-publisher" /></div>
+      <div class="field"><label>출간일 (예: 2021-04-20)</label><input id="f-pubdate" /></div>
+      <div class="field"><label>페이지 수</label><input id="f-pages" inputmode="numeric" /></div>
+      <div class="field"><label>ISBN</label><input id="f-isbn" /></div>
+      <div class="field"><label>표지 이미지 URL (선택)</label><input id="f-cover" placeholder="https://..." /></div>
+      <div class="field"><label>상태</label>
+        <div class="seg" id="f-status">
+          <button data-s="reading">읽는 중</button>
+          <button data-s="finished" class="on">완독</button>
+          <button data-s="dropped">하차</button>
+          <button data-s="wishlist">읽고 싶은</button>
+        </div>
+      </div>
+      <div class="field"><label>별점 (0~10, 5점 만점 · 0.5단위)</label><input id="f-rating" inputmode="numeric" placeholder="예: 9 = 4.5점" /></div>
+      <div class="field"><label>완독일 (선택, YYYY-MM-DD)</label><input id="f-finished" placeholder="2026-05-20" /></div>
+      <div class="field"><label>감상</label><textarea id="f-review" rows="3"></textarea></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" onclick="closeModal()">취소</button>
+        <button class="btn-danger" id="deleteBtn" style="display:none" onclick="deleteCurrent()">삭제</button>
+        <button class="btn-primary" onclick="saveBook()">저장</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  import { firebaseConfig } from "./firebase-config.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, Timestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  let app, auth, db;
+  let currentUser = null, books = [], unsub = null, editingId = null, formStatus = "finished";
+  const appEl = document.getElementById("app");
+
+  const MONTHS = ["", "January","February","March","April","May","June","July","August","September","October","November","December"];
+  const STATUS = { reading:{t:"읽는 중",c:"#85a9db"}, finished:{t:"완독",c:"#85bfaa"}, dropped:{t:"하차",c:"#edb894"}, wishlist:{t:"읽고 싶은",c:"#e0aecc"} };
+
+  function anchorDate(b){ return (b.finishedDate?.toDate?.() || b.startedDate?.toDate?.() || b.addedDate?.toDate?.() || new Date()); }
+  function starStr(r){ if(r==null) return ""; const half=r/2; let s=""; for(let i=1;i<=5;i++){ s += (half>=i? "★" : (half>=i-0.5? "⯨" : "☆")); } return s; }
+
+  // ---- auth ----
+  window.login = () => {
+    if (!auth) { alert("firebase-config.js에 Firebase 웹 설정을 먼저 붙여넣으세요. (README 참고)"); return; }
+    signInWithPopup(auth, new GoogleAuthProvider()).catch(e=>alert(e.message));
+  };
+  window.logout = () => auth && signOut(auth);
+
+  function startFirebase() {
+    try {
+      app = initializeApp(firebaseConfig);
+      auth = getAuth(app);
+      db = getFirestore(app);
+      onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+        if (unsub) { unsub(); unsub = null; }
+        if (user) {
+          const ref = collection(db, "users", user.uid, "books");
+          unsub = onSnapshot(ref, (snap) => {
+            books = snap.docs.map(d => d.data());
+            render();
+          }, (err) => { renderError(err.message); });
+        } else { render(); }
+      });
+    } catch (e) {
+      console.error("Firebase 초기화 실패:", e);
+      render(); // 설정이 없어도 로그인 화면은 보이게
+    }
+  }
+
+  // ---- render ----
+  function render(){
+    if (!currentUser) { renderLogin(); return; }
+    const sortField = (window._sortField ||= "readDate");
+    const asc = (window._asc ??= false);
+    const tracked = books.filter(b => b.status !== "wishlist");
+    // group by month
+    const groups = {};
+    tracked.forEach(b => { const d = anchorDate(b); const key = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+      (groups[key] ||= {y:d.getFullYear(), m:d.getMonth()+1, items:[]}).items.push(b); });
+    const keys = Object.keys(groups).sort().reverse();
+
+    let html = `
+      <div class="wrap">
+        <div class="masthead">
+          <div class="topbtns">
+            <button class="icon-btn" onclick="openAdd()">+</button>
+            <button class="icon-btn" onclick="logout()" title="로그아웃">⎋</button>
+          </div>
+          <div class="kicker">Reading Journal</div>
+          <h1 class="title">My Little<br>Library</h1>
+          <div class="meta">${tracked.length} Books · ${keys.length} Months</div>
+        </div>
+        <div class="content">
+          <div class="toolbar">
+            <select class="pill" onchange="setSort(this.value)">
+              <option value="readDate" ${sortField=='readDate'?'selected':''}>읽은순</option>
+              <option value="rating" ${sortField=='rating'?'selected':''}>평점순</option>
+              <option value="title" ${sortField=='title'?'selected':''}>이름순</option>
+            </select>
+            <button class="pill" onclick="toggleAsc()">${asc?'오름차순 ↑':'내림차순 ↓'}</button>
+          </div>`;
+
+    if (keys.length === 0) {
+      html += `<div class="empty">아직 기록한 책이 없어요.<br>오른쪽 위 + 로 첫 책을 추가하세요.</div>`;
+    }
+    for (const k of keys) {
+      const g = groups[k];
+      const cnt = s => g.items.filter(b=>b.status===s).length;
+      const sorted = sortBooks(g.items, sortField, asc);
+      html += `<div class="month">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <h2>${MONTHS[g.m]}</h2><span class="mdate">${String(g.m).padStart(2,"0")} / ${g.y}</span>
+        </div>
+        <div class="counts">
+          <span><span class="dot" style="background:${STATUS.finished.c}"></span>완독 ${cnt("finished")}</span>
+          <span><span class="dot" style="background:${STATUS.reading.c}"></span>읽는중 ${cnt("reading")}</span>
+          <span><span class="dot" style="background:${STATUS.dropped.c}"></span>하차 ${cnt("dropped")}</span>
+        </div>
+        <div class="grid">${sorted.map(cardHTML).join("")}</div>
+        <div class="divider"></div>
+      </div>`;
+    }
+    html += `</div></div>`;
+    appEl.innerHTML = html;
+  }
+
+  function sortBooks(arr, field, asc){
+    const a = [...arr].sort((x,y)=>{
+      if (field==="rating") return (x.rating??-1)-(y.rating??-1);
+      if (field==="title") return (x.title||"").localeCompare(y.title||"", "ko");
+      return anchorDate(x) - anchorDate(y); // readDate
+    });
+    return asc ? a : a.reverse();
+  }
+
+  function cardHTML(b){
+    const cover = b.coverImageURL ? `<img src="${b.coverImageURL}" onerror="this.style.display='none';this.parentElement.innerHTML='<div class=ph>'+${JSON.stringify(b.title)}+'</div>'"/>`
+      : `<div class="ph">${escapeHtml(b.title)}</div>`;
+    return `<div class="card" onclick='openEdit(${JSON.stringify(b.id)})'>
+      <div class="cover">${cover}</div>
+      <div class="bt">${escapeHtml(b.title)}</div>
+      ${b.author?`<div class="ba">${escapeHtml(b.author)}</div>`:""}
+      ${b.rating!=null?`<div class="stars">${starStr(b.rating)}</div>`:""}
+      ${b.reviewText?`<div class="br">${escapeHtml(b.reviewText)}</div>`:""}
+    </div>`;
+  }
+
+  function renderLogin(){
+    appEl.innerHTML = `<div class="login">
+      <div class="kicker" style="color:var(--sub)">Reading Journal</div>
+      <h1>My Little<br>Library</h1>
+      <p>읽은 책을 기록하고, 폰과 웹 어디서든 이어보세요.</p>
+      <button class="gbtn" onclick="login()">Google로 계속하기</button>
+    </div>`;
+  }
+  function renderError(msg){
+    if (!currentUser) return;
+    const c = document.querySelector(".content");
+    if (c) c.insertAdjacentHTML("afterbegin", `<div class="banner">불러오기 실패: ${escapeHtml(msg)} — Firestore 보안 규칙이 게시됐는지 확인하세요.</div>`);
+  }
+  function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  window.setSort = (v)=>{ window._sortField=v; render(); };
+  window.toggleAsc = ()=>{ window._asc=!window._asc; render(); };
+
+  // ---- modal ----
+  const $=id=>document.getElementById(id);
+  document.querySelectorAll("#f-status button").forEach(btn=>{
+    btn.onclick=()=>{ formStatus=btn.dataset.s; document.querySelectorAll("#f-status button").forEach(b=>b.classList.toggle("on", b===btn)); };
+  });
+  function setStatusUI(s){ formStatus=s; document.querySelectorAll("#f-status button").forEach(b=>b.classList.toggle("on", b.dataset.s===s)); }
+
+  window.openAdd = ()=>{ editingId=null; $("modalTitle").textContent="책 추가"; $("deleteBtn").style.display="none";
+    ["title","author","publisher","pubdate","pages","isbn","cover","rating","finished","review"].forEach(k=>$("f-"+k).value="");
+    setStatusUI("finished"); $("modalBg").classList.add("open"); };
+  window.openEdit = (id)=>{ const b=books.find(x=>x.id===id); if(!b) return; editingId=id;
+    $("modalTitle").textContent="책 수정"; $("deleteBtn").style.display="block";
+    $("f-title").value=b.title||""; $("f-author").value=b.author||""; $("f-publisher").value=b.publisher||"";
+    $("f-pubdate").value=b.publishedDate||""; $("f-pages").value=b.pageCount??""; $("f-isbn").value=b.isbn||"";
+    $("f-cover").value=b.coverImageURL||""; $("f-rating").value=b.rating??"";
+    $("f-finished").value=b.finishedDate?.toDate?.() ? isoDate(b.finishedDate.toDate()) : "";
+    $("f-review").value=b.reviewText||""; setStatusUI(b.status||"finished"); $("modalBg").classList.add("open"); };
+  window.closeModal = ()=>$("modalBg").classList.remove("open");
+  function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+  window.saveBook = async ()=>{
+    const title=$("f-title").value.trim(); if(!title){ alert("제목을 입력하세요."); return; }
+    const old = editingId ? books.find(x=>x.id===editingId) : null;
+    const id = editingId || crypto.randomUUID();
+    const num = v => v.trim()==="" ? null : Number(v);
+    const data = {
+      id, title,
+      author: $("f-author").value.trim() || null,
+      publisher: $("f-publisher").value.trim() || null,
+      publishedDate: $("f-pubdate").value.trim() || null,
+      pageCount: num($("f-pages").value),
+      isbn: $("f-isbn").value.trim() || null,
+      coverImageURL: $("f-cover").value.trim() || null,
+      status: formStatus,
+      rating: num($("f-rating").value),
+      reviewText: $("f-review").value.trim() || null,
+      startedDate: old?.startedDate || null,
+      finishedDate: $("f-finished").value.trim() ? Timestamp.fromDate(new Date($("f-finished").value.trim())) : (old?.finishedDate || null),
+      addedDate: old?.addedDate || Timestamp.fromDate(new Date())
+    };
+    try {
+      await setDoc(doc(db, "users", currentUser.uid, "books", id), data);
+      closeModal();
+    } catch(e){ alert("저장 실패: "+e.message); }
+  };
+  window.deleteCurrent = async ()=>{
+    if(!editingId) return; if(!confirm("이 책 기록을 삭제할까요?")) return;
+    try { await deleteDoc(doc(db, "users", currentUser.uid, "books", editingId)); closeModal(); }
+    catch(e){ alert("삭제 실패: "+e.message); }
+  };
+
+  // ---- start ----
+  render();         // 초기 로그인 화면(설정 없어도 표시)
+  startFirebase();  // Firebase 연결(실패해도 로그인 화면 유지)
+</script>
+</body>
+</html>
